@@ -1,0 +1,7 @@
+{
+  "project_id" : "mgtools",
+  "conduit_uri" : "https://phabricator.memgraph.io",
+  "phabricator_uri" : "https://phabricator.memgraph.io",
+  "git.default-relative-commit": "origin/master",
+  "arc.land.onto.default": "master"
+}
