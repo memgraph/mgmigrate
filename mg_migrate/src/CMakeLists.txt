@@ -7,7 +7,8 @@ include_directories(
   ${MG_MIGRATE_SOURCE_ROOT})
 
 set(MG_MIGRATE_LIB_SOURCES
-  memgraph_destination.cpp)
+  memgraph_destination.cpp
+  memgraph_source.cpp)
 
 add_compile_options(-Wall -Wextra -Wredundant-move)
 

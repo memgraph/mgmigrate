@@ -5,6 +5,7 @@
 
 #include "memgraph_client.hpp"
 #include "memgraph_destination.hpp"
+#include "memgraph_source.hpp"
 
 const char *kUsage =
     "A tool that imports data to the destination Memgraph from the given "
@@ -43,6 +44,37 @@ bool DoEndpointsMatch(const std::string_view &host1, uint16_t port1,
   return host1 == host2 && port1 == port2;
 }
 
+/// Migrates data from the `source` Memgraph database to the `destination`
+/// Memgraph database.
+void MigrateMemgraphDatabase(MemgraphSource *source,
+                             MemgraphDestination *destination) {
+  // Migrate vertices.
+  source->ReadVertices(
+      [&destination](const auto &vertex) { destination->CreateVertex(vertex); });
+
+  // Migrate edges.
+  source->ReadEdges(
+      [&destination](const auto &edge) { destination->CreateEdge(edge); });
+
+  // Migrate indices.
+  const auto &index_info = source->ReadIndices();
+  for (const auto &label : index_info.label) {
+    destination->CreateLabelIndex(label);
+  }
+  for (const auto &[label, property] : index_info.label_property) {
+    destination->CreateLabelPropertyIndex(label, property);
+  }
+
+  // Migrate constraints.
+  const auto &constraint_info = source->ReadConstraints();
+  for (const auto &[label, property] : constraint_info.existence) {
+    destination->CreateExistenceConstraint(label, property);
+  }
+  for (const auto &[label, properties] : constraint_info.unique) {
+    destination->CreateUniqueConstraint(label, properties);
+  }
+}
+
 int main(int argc, char **argv) {
   gflags::SetUsageMessage(kUsage);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -52,13 +84,13 @@ int main(int argc, char **argv) {
       << "Please specify a valid server address and port for the source "
          "database.";
 
-  CHECK(!DoEnpointsMatch(FLAGS_source_host, FLAGS_source_port,
-                         FLAGS_destination_host, FLAGS_destination_port))
+  CHECK(!DoEndpointsMatch(FLAGS_source_host, FLAGS_source_port,
+                          FLAGS_destination_host, FLAGS_destination_port))
       << "The source and destination endpoints match. Use two "
-         "different endpoints."
+         "different endpoints.";
 
-      // Create a connection to the source database.
-      auto source_db = MemgraphClientConnection::Connect(
+  // Create a connection to the source database.
+  auto source_db = MemgraphClientConnection::Connect(
       {.host = FLAGS_source_host,
        .port = static_cast<uint16_t>(FLAGS_source_port),
        .username = FLAGS_source_username,
@@ -79,8 +111,9 @@ int main(int argc, char **argv) {
       << "Couldn't connect to the destination Memgraph database.";
 
   MemgraphDestination destination(std::move(destination_db));
+  MemgraphSource source(std::move(source_db));
 
-  // TODO(tsabolcec): Import!
+  MigrateMemgraphDatabase(&source, &destination);
 
   return 0;
 }
