@@ -17,3 +17,11 @@ target_include_directories(${UNIT_TEST_PREFIX}memgraph_destination PRIVATE
   ${MG_CLIENT_INCLUDE_DIR}
   ${MG_MIGRATE_SOURCE_ROOT})
 set_target_properties(${UNIT_TEST_PREFIX}memgraph_destination PROPERTIES OUTPUT_NAME memgraph_destination)
+
+add_executable(${UNIT_TEST_PREFIX}value_v2 value_v2.cpp)
+target_link_libraries(${UNIT_TEST_PREFIX}value_v2 gtest gtest-main mgmigrate-value2 glog gflags)
+target_include_directories(${UNIT_TEST_PREFIX}value_v2 PRIVATE
+  ${GTEST_INCLUDE_DIR}
+  ${MG_CLIENT_INCLUDE_DIR}
+  ${MG_MIGRATE_SOURCE_ROOT})
+set_target_properties(${UNIT_TEST_PREFIX}value_v2 PROPERTIES OUTPUT_NAME value_v2)
