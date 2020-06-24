@@ -6,40 +6,72 @@
 
 #include <mgclient.h>
 
+#include "utils/cast.hpp"
+
 namespace mg {
 
 // Forward declarations:
 class ConstList;
 class ConstMap;
+class ConstNode;
+class ConstRelationship;
+class ConstUnboundRelationship;
+class ConstPath;
 class ConstValue;
 class Value;
 
-#define CREATE_ITERATOR(container, element)                              \
-  class Iterator {                                                       \
-   private:                                                              \
-    friend class container;                                              \
-                                                                         \
-   public:                                                               \
-    bool operator==(const Iterator &other) {                             \
-      return iterable_ == other.iterable_ && index_ == other.index_;     \
-    }                                                                    \
-                                                                         \
-    bool operator!=(const Iterator &other) { return !(*this == other); } \
-                                                                         \
-    Iterator &operator++() {                                             \
-      index_++;                                                          \
-      return *this;                                                      \
-    }                                                                    \
-                                                                         \
-    element operator*() const;                                           \
-                                                                         \
-   private:                                                              \
-    Iterator(const container *iterable, size_t index)                    \
-        : iterable_(iterable), index_(index) {}                          \
-                                                                         \
-    const container *iterable_;                                          \
-    size_t index_;                                                       \
+#define CREATE_ITERATOR(container, element)                                    \
+  class Iterator {                                                             \
+   private:                                                                    \
+    friend class container;                                                    \
+                                                                               \
+   public:                                                                     \
+    bool operator==(const Iterator &other) const {                             \
+      return iterable_ == other.iterable_ && index_ == other.index_;           \
+    }                                                                          \
+                                                                               \
+    bool operator!=(const Iterator &other) const { return !(*this == other); } \
+                                                                               \
+    Iterator &operator++() {                                                   \
+      index_++;                                                                \
+      return *this;                                                            \
+    }                                                                          \
+                                                                               \
+    element operator*() const;                                                 \
+                                                                               \
+   private:                                                                    \
+    Iterator(const container *iterable, size_t index)                          \
+        : iterable_(iterable), index_(index) {}                                \
+                                                                               \
+    const container *iterable_;                                                \
+    size_t index_;                                                             \
   }
+
+/// Wraps int64_t to prevent dangerous implicit conversions.
+class Id {
+ public:
+  Id() = default;
+
+  /// Construct Id from uint64_t
+  static Id FromUint(uint64_t id) { return Id(utils::MemcpyCast<int64_t>(id)); }
+
+  /// Construct Id from int64_t
+  static Id FromInt(int64_t id) { return Id(id); }
+
+  int64_t AsInt() const { return id_; }
+  uint64_t AsUint() const { return utils::MemcpyCast<uint64_t>(id_); }
+
+ private:
+  explicit Id(int64_t id) : id_(id) {}
+
+  int64_t id_;
+};
+
+inline bool operator==(const Id &id1, const Id &id2) {
+  return id1.AsInt() == id2.AsInt();
+}
+
+inline bool operator!=(const Id &id1, const Id &id2) { return !(id1 == id2); }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// List:
@@ -219,6 +251,299 @@ class ConstMap final {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+// Node:
+
+class Node final {
+ private:
+  friend class Value;
+
+ public:
+  class Labels final {
+   public:
+    CREATE_ITERATOR(Labels, std::string_view);
+
+    explicit Labels(const mg_node *node) : node_(node) {}
+
+    size_t size() const { return mg_node_label_count(node_); }
+
+    std::string_view operator[](size_t index) const;
+
+    Iterator begin() { return Iterator(this, 0); }
+    Iterator end() { return Iterator(this, size()); }
+
+   private:
+    const mg_node *node_;
+  };
+
+  explicit Node(mg_node *ptr) : ptr_(ptr) {}
+
+  Node(const Node &other);
+  Node(Node &&other);
+  Node &operator=(const Node &other) = delete;
+  Node &operator=(Node &&other) = delete;
+  ~Node();
+
+  Id id() const { return Id::FromInt(mg_node_id(ptr_)); }
+
+  Labels labels() const { return Labels(ptr_); }
+
+  ConstMap properties() const { return ConstMap(mg_node_properties(ptr_)); }
+
+  ConstNode AsConstNode() const;
+
+  bool operator==(const Node &other) const;
+  bool operator==(const ConstNode &other) const;
+  bool operator!=(const Node &other) const { return !(*this == other); }
+  bool operator!=(const ConstNode &other) const { return !(*this == other); }
+
+  const mg_node *ptr() const { return ptr_; }
+
+ private:
+  mg_node *ptr_;
+};
+
+class ConstNode final {
+ public:
+  explicit ConstNode(const mg_node *const_ptr) : const_ptr_(const_ptr) {}
+
+  Id id() const { return Id::FromInt(mg_node_id(const_ptr_)); }
+
+  Node::Labels labels() const { return Node::Labels(const_ptr_); }
+
+  ConstMap properties() const {
+    return ConstMap(mg_node_properties(const_ptr_));
+  }
+
+  bool operator==(const ConstNode &other) const;
+  bool operator==(const Node &other) const;
+  bool operator!=(const ConstNode &other) const { return !(*this == other); }
+  bool operator!=(const Node &other) const { return !(*this == other); }
+
+  const mg_node *ptr() const { return const_ptr_; }
+
+ private:
+  const mg_node *const_ptr_;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Relationship:
+
+class Relationship final {
+ private:
+  friend class Value;
+
+ public:
+  explicit Relationship(mg_relationship *ptr) : ptr_(ptr) {}
+
+  Relationship(const Relationship &other);
+  Relationship(Relationship &&other);
+  Relationship &operator=(const Relationship &other) = delete;
+  Relationship &operator=(Relationship &&other) = delete;
+  ~Relationship();
+
+  Id id() const { return Id::FromInt(mg_relationship_id(ptr_)); }
+
+  Id from() const { return Id::FromInt(mg_relationship_start_id(ptr_)); }
+
+  Id to() const { return Id::FromInt(mg_relationship_end_id(ptr_)); }
+
+  std::string_view type() const;
+
+  ConstMap properties() const {
+    return ConstMap(mg_relationship_properties(ptr_));
+  }
+
+  ConstRelationship AsConstRelationship() const;
+
+  bool operator==(const Relationship &other) const;
+  bool operator==(const ConstRelationship &other) const;
+  bool operator!=(const Relationship &other) const { return !(*this == other); }
+  bool operator!=(const ConstRelationship &other) const {
+    return !(*this == other);
+  }
+
+  const mg_relationship *ptr() const { return ptr_; }
+
+ private:
+  mg_relationship *ptr_;
+};
+
+class ConstRelationship final {
+ public:
+  explicit ConstRelationship(const mg_relationship *const_ptr)
+      : const_ptr_(const_ptr) {}
+
+  Id id() const { return Id::FromInt(mg_relationship_id(const_ptr_)); }
+
+  Id from() const { return Id::FromInt(mg_relationship_start_id(const_ptr_)); }
+
+  Id to() const { return Id::FromInt(mg_relationship_end_id(const_ptr_)); }
+
+  std::string_view type() const;
+
+  ConstMap properties() const {
+    return ConstMap(mg_relationship_properties(const_ptr_));
+  }
+
+  bool operator==(const ConstRelationship &other) const;
+  bool operator==(const Relationship &other) const;
+  bool operator!=(const ConstRelationship &other) const {
+    return !(*this == other);
+  }
+  bool operator!=(const Relationship &other) const { return !(*this == other); }
+
+  const mg_relationship *ptr() const { return const_ptr_; }
+
+ private:
+  const mg_relationship *const_ptr_;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// UnboundRelationship:
+
+class UnboundRelationship final {
+ private:
+  friend class Value;
+
+ public:
+  explicit UnboundRelationship(mg_unbound_relationship *ptr) : ptr_(ptr) {}
+
+  UnboundRelationship(const UnboundRelationship &other);
+  UnboundRelationship(UnboundRelationship &&other);
+  UnboundRelationship &operator=(const UnboundRelationship &other) = delete;
+  UnboundRelationship &operator=(UnboundRelationship &&other) = delete;
+  ~UnboundRelationship();
+
+  Id id() const { return Id::FromInt(mg_unbound_relationship_id(ptr_)); }
+
+  std::string_view type() const;
+
+  ConstMap properties() const {
+    return ConstMap(mg_unbound_relationship_properties(ptr_));
+  }
+
+  ConstUnboundRelationship AsConstUnboundRelationship() const;
+
+  bool operator==(const UnboundRelationship &other) const;
+  bool operator==(const ConstUnboundRelationship &other) const;
+  bool operator!=(const UnboundRelationship &other) const {
+    return !(*this == other);
+  }
+  bool operator!=(const ConstUnboundRelationship &other) const {
+    return !(*this == other);
+  }
+
+  const mg_unbound_relationship *ptr() const { return ptr_; }
+
+ private:
+  mg_unbound_relationship *ptr_;
+};
+
+class ConstUnboundRelationship final {
+ public:
+  explicit ConstUnboundRelationship(const mg_unbound_relationship *const_ptr)
+      : const_ptr_(const_ptr) {}
+
+  Id id() const { return Id::FromInt(mg_unbound_relationship_id(const_ptr_)); }
+
+  std::string_view type() const;
+
+  ConstMap properties() const {
+    return ConstMap(mg_unbound_relationship_properties(const_ptr_));
+  }
+
+  bool operator==(const ConstUnboundRelationship &other) const;
+  bool operator==(const UnboundRelationship &other) const;
+  bool operator!=(const ConstUnboundRelationship &other) const {
+    return !(*this == other);
+  }
+  bool operator!=(const UnboundRelationship &other) const {
+    return !(*this == other);
+  }
+
+  const mg_unbound_relationship *ptr() const { return const_ptr_; }
+
+ private:
+  const mg_unbound_relationship *const_ptr_;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Path:
+
+class Path final {
+ private:
+  friend class Value;
+
+ public:
+  explicit Path(mg_path *ptr) : ptr_(ptr) {}
+
+  Path(const Path &other);
+  Path(Path &&other);
+  Path &operator=(const Path &other);
+  Path &operator=(Path &&other);
+  ~Path();
+
+  /// Length of the path in number of edges.
+  size_t length() const { return mg_path_length(ptr_); }
+
+  /// Returns the vertex at the given `index`, which should be less than or
+  /// equal to length of the path.
+  ConstNode GetNodeAt(size_t index) const;
+
+  /// Returns the edge at the given `index`, which should be less than length of
+  /// the path.
+  ConstUnboundRelationship GetRelationshipAt(size_t index) const;
+
+  /// Returns the orientation of the edge at the given `index`, which should be
+  /// less than length of the path. Returns true if the edge is reversed, false
+  /// otherwise.
+  bool IsReversedRelationshipAt(size_t index) const;
+
+  ConstPath AsConstPath() const;
+
+  bool operator==(const Path &other) const;
+  bool operator==(const ConstPath &other) const;
+  bool operator!=(const Path &other) const { return !(*this == other); }
+  bool operator!=(const ConstPath &other) const { return !(*this == other); }
+
+  const mg_path *ptr() const { return ptr_; }
+
+ private:
+  mg_path *ptr_;
+};
+
+class ConstPath final {
+ public:
+  explicit ConstPath(const mg_path *const_ptr) : const_ptr_(const_ptr) {}
+
+  /// Length of the path in number of edges.
+  size_t length() const { return mg_path_length(const_ptr_); }
+
+  /// Returns the vertex at the given `index`, which should be less than or
+  /// equal to length of the path.
+  ConstNode GetNodeAt(size_t index) const;
+
+  /// Returns the edge at the given `index`, which should be less than length of
+  /// the path.
+  ConstUnboundRelationship GetRelationshipAt(size_t index) const;
+
+  /// Returns the orientation of the edge at the given `index`, which should be
+  /// less than length of the path. Returns true if the edge is reversed, false
+  /// otherwise.
+  bool IsReversedRelationshipAt(size_t index) const;
+
+  bool operator==(const ConstPath &other) const;
+  bool operator==(const Path &other) const;
+  bool operator!=(const ConstPath &other) const { return !(*this == other); }
+  bool operator!=(const Path &other) const { return !(*this == other); }
+
+  const mg_path *ptr() const { return const_ptr_; }
+
+ private:
+  const mg_path *const_ptr_;
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // Value:
 
 class Value final {
@@ -236,9 +561,9 @@ class Value final {
     String,
     List,
     Map,
-    Vertex,
-    Edge,
-    UnboundedEdge,
+    Node,
+    Relationship,
+    UnboundRelationship,
     Path
   };
 
@@ -271,9 +596,29 @@ class Value final {
   explicit Value(List &&list);
 
   /// Constructs a map value and takes the ownership of the `map`.
-  /// Behaviour of accessing the `list` after performing this operation is
+  /// Behaviour of accessing the `map` after performing this operation is
   /// considered undefined.
   explicit Value(Map &&map);
+
+  /// Constructs a vertex value and takes the ownership of the given `vertex`.
+  /// Behaviour of accessing the `vertex` after performing this operation is
+  /// considered undefined.
+  explicit Value(Node &&vertex);
+
+  /// Constructs an edge value and takes the ownership of the given `edge`.
+  /// Behaviour of accessing the `edge` after performing this operation is
+  /// considered undefined.
+  explicit Value(Relationship &&edge);
+
+  /// Constructs an unbounded edge value and takes the ownership of the given
+  /// `edge`. Behaviour of accessing the `edge` after performing this operation
+  /// is considered undefined.
+  explicit Value(UnboundRelationship &&edge);
+
+  /// Constructs a path value and takes the ownership of the given `path`.
+  /// Behaviour of accessing the `path` after performing this operation is
+  /// considered undefined.
+  explicit Value(Path &&path);
 
   bool ValueBool() const;
   int64_t ValueInt() const;
@@ -281,6 +626,10 @@ class Value final {
   std::string_view ValueString() const;
   const ConstList ValueList() const;
   const ConstMap ValueMap() const;
+  const ConstNode ValueNode() const;
+  const ConstRelationship ValueRelationship() const;
+  const ConstUnboundRelationship ValueUnboundRelationship() const;
+  const ConstPath ValuePath() const;
 
   Type type() const;
 
@@ -307,6 +656,10 @@ class ConstValue final {
   std::string_view ValueString() const;
   const ConstList ValueList() const;
   const ConstMap ValueMap() const;
+  const ConstNode ValueNode() const;
+  const ConstRelationship ValueRelationship() const;
+  const ConstUnboundRelationship ValueUnboundRelationship() const;
+  const ConstPath ValuePath() const;
 
   Value::Type type() const;
 

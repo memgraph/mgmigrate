@@ -1,5 +1,7 @@
 #include "mgclient/v2/value.hpp"
 
+#include <set>
+
 #include <glog/logging.h>
 
 namespace mg {
@@ -26,11 +28,11 @@ Value::Type ConvertType(mg_value_type type) {
     case MG_VALUE_TYPE_MAP:
       return Value::Type::Map;
     case MG_VALUE_TYPE_NODE:
-      return Value::Type::Vertex;
+      return Value::Type::Node;
     case MG_VALUE_TYPE_RELATIONSHIP:
-      return Value::Type::Edge;
+      return Value::Type::Relationship;
     case MG_VALUE_TYPE_UNBOUND_RELATIONSHIP:
-      return Value::Type::UnboundedEdge;
+      return Value::Type::UnboundRelationship;
     case MG_VALUE_TYPE_PATH:
       return Value::Type::Path;
     case MG_VALUE_TYPE_UNKNOWN:
@@ -42,6 +44,9 @@ Value::Type ConvertType(mg_value_type type) {
 bool AreValuesEqual(const mg_value *value1, const mg_value *value2);
 
 bool AreListsEqual(const mg_list *list1, const mg_list *list2) {
+  if (list1 == list2) {
+    return true;
+  }
   if (mg_list_size(list1) != mg_list_size(list2)) {
     return false;
   }
@@ -55,6 +60,9 @@ bool AreListsEqual(const mg_list *list1, const mg_list *list2) {
 }
 
 bool AreMapsEqual(const mg_map *map1, const mg_map *map2) {
+  if (map1 == map2) {
+    return true;
+  }
   if (mg_map_size(map1) != mg_map_size(map2)) {
     return false;
   }
@@ -74,7 +82,96 @@ bool AreMapsEqual(const mg_map *map1, const mg_map *map2) {
   return true;
 }
 
+bool AreNodesEqual(const mg_node *node1, const mg_node *node2) {
+  if (node1 == node2) {
+    return true;
+  }
+  if (mg_node_id(node1) != mg_node_id(node2)) {
+    return false;
+  }
+  if (mg_node_label_count(node1) != mg_node_label_count(node2)) {
+    return false;
+  }
+  std::set<std::string_view> labels1;
+  std::set<std::string_view> labels2;
+  const size_t label_count = mg_node_label_count(node1);
+  for (size_t i = 0; i < label_count; ++i) {
+    labels1.insert(ConvertString(mg_node_label_at(node1, i)));
+    labels2.insert(ConvertString(mg_node_label_at(node2, i)));
+  }
+  if (labels1 != labels2) {
+    return false;
+  }
+  return AreMapsEqual(mg_node_properties(node1), mg_node_properties(node2));
+}
+
+bool AreRelationshipsEqual(const mg_relationship *rel1,
+                           const mg_relationship *rel2) {
+  if (rel1 == rel2) {
+    return true;
+  }
+  if (mg_relationship_id(rel1) != mg_relationship_id(rel2)) {
+    return false;
+  }
+  if (mg_relationship_start_id(rel1) != mg_relationship_start_id(rel2)) {
+    return false;
+  }
+  if (mg_relationship_end_id(rel1) != mg_relationship_end_id(rel2)) {
+    return false;
+  }
+  if (ConvertString(mg_relationship_type(rel1)) !=
+      ConvertString(mg_relationship_type(rel2))) {
+    return false;
+  }
+  return AreMapsEqual(mg_relationship_properties(rel1),
+                      mg_relationship_properties(rel2));
+}
+
+bool AreUnboundRelationshipsEqual(const mg_unbound_relationship *rel1,
+                                  const mg_unbound_relationship *rel2) {
+  if (rel1 == rel2) {
+    return true;
+  }
+  if (mg_unbound_relationship_id(rel1) != mg_unbound_relationship_id(rel2)) {
+    return false;
+  }
+  if (ConvertString(mg_unbound_relationship_type(rel1)) !=
+      ConvertString(mg_unbound_relationship_type(rel2))) {
+    return false;
+  }
+  return AreMapsEqual(mg_unbound_relationship_properties(rel1),
+                      mg_unbound_relationship_properties(rel2));
+}
+
+bool ArePathsEqual(const mg_path *path1, const mg_path *path2) {
+  if (path1 == path2) {
+    return true;
+  }
+  if (mg_path_length(path1) != mg_path_length(path2)) {
+    return false;
+  }
+  const size_t len = mg_path_length(path1);
+  for (size_t i = 0; i < len; ++i) {
+    if (!AreNodesEqual(mg_path_node_at(path1, i), mg_path_node_at(path2, i))) {
+      return false;
+    }
+    if (!AreUnboundRelationshipsEqual(mg_path_relationship_at(path1, i),
+                                      mg_path_relationship_at(path2, i))) {
+      return false;
+    }
+    if (mg_path_relationship_reversed_at(path1, i) !=
+        mg_path_relationship_reversed_at(path2, i)) {
+      return false;
+    }
+  }
+  return AreNodesEqual(mg_path_node_at(path1, len),
+                       mg_path_node_at(path2, len));
+}
+
 bool AreValuesEqual(const mg_value *value1, const mg_value *value2) {
+  if (value1 == value2) {
+    return true;
+  }
   if (mg_value_get_type(value1) != mg_value_get_type(value2)) {
     return false;
   }
@@ -95,11 +192,16 @@ bool AreValuesEqual(const mg_value *value1, const mg_value *value2) {
     case MG_VALUE_TYPE_MAP:
       return AreMapsEqual(mg_value_map(value1), mg_value_map(value2));
     case MG_VALUE_TYPE_NODE:
+      return AreNodesEqual(mg_value_node(value1), mg_value_node(value2));
     case MG_VALUE_TYPE_RELATIONSHIP:
+      return AreRelationshipsEqual(mg_value_relationship(value1),
+                                   mg_value_relationship(value2));
     case MG_VALUE_TYPE_UNBOUND_RELATIONSHIP:
+      return AreUnboundRelationshipsEqual(
+          mg_value_unbound_relationship(value1),
+          mg_value_unbound_relationship(value2));
     case MG_VALUE_TYPE_PATH:
-      // TODO(tsabolcec): Implement other types.
-      return false;
+      return ArePathsEqual(mg_value_path(value1), mg_value_path(value2));
     case MG_VALUE_TYPE_UNKNOWN:
       CHECK(false) << "Unknown value type!";
       return false;
@@ -221,9 +323,8 @@ bool Map::operator==(const ConstMap &other) const {
 }
 
 std::pair<std::string_view, ConstValue> ConstMap::Iterator::operator*() const {
-  return std::make_pair(
-      ConvertString(mg_map_key_at(iterable_->ptr(), index_)),
-      ConstValue(mg_map_value_at(iterable_->ptr(), index_)));
+  return std::make_pair(ConvertString(mg_map_key_at(iterable_->ptr(), index_)),
+                        ConstValue(mg_map_value_at(iterable_->ptr(), index_)));
 }
 
 ConstValue ConstMap::operator[](const std::string_view &key) const {
@@ -245,6 +346,207 @@ bool ConstMap::operator==(const ConstMap &other) const {
 
 bool ConstMap::operator==(const Map &other) const {
   return AreMapsEqual(const_ptr_, other.ptr());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Node:
+
+std::string_view Node::Labels::Iterator::operator*() const {
+  return (*iterable_)[index_];
+}
+
+std::string_view Node::Labels::operator[](size_t index) const {
+  return ConvertString(mg_node_label_at(node_, index));
+}
+
+Node::Node(const Node &other) : Node(mg_node_copy(other.ptr_)) {}
+
+Node::Node(Node &&other) : ptr_(other.ptr_) { other.ptr_ = nullptr; }
+
+Node::~Node() {
+  if (ptr_ != nullptr) {
+    mg_node_destroy(ptr_);
+  }
+}
+
+bool Node::operator==(const Node &other) const {
+  return AreNodesEqual(ptr_, other.ptr_);
+}
+
+bool Node::operator==(const ConstNode &other) const {
+  return AreNodesEqual(ptr_, other.ptr());
+}
+
+ConstNode Node::AsConstNode() const { return ConstNode(ptr_); }
+
+bool ConstNode::operator==(const ConstNode &other) const {
+  return AreNodesEqual(const_ptr_, other.const_ptr_);
+}
+
+bool ConstNode::operator==(const Node &other) const {
+  return AreNodesEqual(const_ptr_, other.ptr());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Relationship:
+
+Relationship::Relationship(const Relationship &other)
+    : Relationship(mg_relationship_copy(other.ptr_)) {}
+
+Relationship::Relationship(Relationship &&other) : Relationship(other.ptr_) {
+  other.ptr_ = nullptr;
+}
+
+Relationship::~Relationship() {
+  if (ptr_ != nullptr) {
+    mg_relationship_destroy(ptr_);
+  }
+}
+
+std::string_view Relationship::type() const {
+  return ConvertString(mg_relationship_type(ptr_));
+}
+
+ConstRelationship Relationship::AsConstRelationship() const {
+  return ConstRelationship(ptr_);
+}
+
+bool Relationship::operator==(const Relationship &other) const {
+  return AreRelationshipsEqual(ptr_, other.ptr_);
+}
+
+bool Relationship::operator==(const ConstRelationship &other) const {
+  return AreRelationshipsEqual(ptr_, other.ptr());
+}
+
+std::string_view ConstRelationship::type() const {
+  return ConvertString(mg_relationship_type(const_ptr_));
+}
+
+bool ConstRelationship::operator==(const ConstRelationship &other) const {
+  return AreRelationshipsEqual(const_ptr_, other.const_ptr_);
+}
+
+bool ConstRelationship::operator==(const Relationship &other) const {
+  return AreRelationshipsEqual(const_ptr_, other.ptr());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// UnboundRelationship:
+
+UnboundRelationship::UnboundRelationship(const UnboundRelationship &other)
+    : ptr_(mg_unbound_relationship_copy(other.ptr_)) {}
+
+UnboundRelationship::UnboundRelationship(UnboundRelationship &&other)
+    : ptr_(other.ptr_) {
+  other.ptr_ = nullptr;
+}
+
+UnboundRelationship::~UnboundRelationship() {
+  if (ptr_ != nullptr) {
+    mg_unbound_relationship_destroy(ptr_);
+  }
+}
+
+std::string_view UnboundRelationship::type() const {
+  return ConvertString(mg_unbound_relationship_type(ptr_));
+}
+
+ConstUnboundRelationship UnboundRelationship::AsConstUnboundRelationship()
+    const {
+  return ConstUnboundRelationship(ptr_);
+}
+
+bool UnboundRelationship::operator==(const UnboundRelationship &other) const {
+  return AreUnboundRelationshipsEqual(ptr_, other.ptr_);
+}
+
+bool UnboundRelationship::operator==(
+    const ConstUnboundRelationship &other) const {
+  return AreUnboundRelationshipsEqual(ptr_, other.ptr());
+}
+
+std::string_view ConstUnboundRelationship::type() const {
+  return ConvertString(mg_unbound_relationship_type(const_ptr_));
+}
+
+bool ConstUnboundRelationship::operator==(
+    const ConstUnboundRelationship &other) const {
+  return AreUnboundRelationshipsEqual(const_ptr_, other.const_ptr_);
+}
+
+bool ConstUnboundRelationship::operator==(
+    const UnboundRelationship &other) const {
+  return AreUnboundRelationshipsEqual(const_ptr_, other.ptr());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Path:
+
+Path::Path(const Path &other) : ptr_(mg_path_copy(other.ptr_)) {}
+
+Path::Path(Path &&other) : ptr_(other.ptr_) { other.ptr_ = nullptr; }
+
+Path::~Path() {
+  if (ptr_ != nullptr) {
+    mg_path_destroy(ptr_);
+  }
+}
+
+ConstNode Path::GetNodeAt(size_t index) const {
+  auto vertex_ptr = mg_path_node_at(ptr_, index);
+  CHECK(vertex_ptr != nullptr) << "Unable to access the vertex of a path!";
+  return ConstNode(vertex_ptr);
+}
+
+ConstUnboundRelationship Path::GetRelationshipAt(size_t index) const {
+  auto edge_ptr = mg_path_relationship_at(ptr_, index);
+  CHECK(edge_ptr != nullptr) << "Unable to access the edge of a path!";
+  return ConstUnboundRelationship(edge_ptr);
+}
+
+bool Path::IsReversedRelationshipAt(size_t index) const {
+  auto is_reversed = mg_path_relationship_reversed_at(ptr_, index);
+  CHECK(is_reversed != -1)
+      << "Unable to access the edge orientation of a path!";
+  return is_reversed == 1;
+}
+
+ConstPath Path::AsConstPath() const { return ConstPath(ptr_); }
+
+bool Path::operator==(const Path &other) const {
+  return ArePathsEqual(ptr_, other.ptr_);
+}
+
+bool Path::operator==(const ConstPath &other) const {
+  return ArePathsEqual(ptr_, other.ptr());
+}
+
+ConstNode ConstPath::GetNodeAt(size_t index) const {
+  auto vertex_ptr = mg_path_node_at(const_ptr_, index);
+  CHECK(vertex_ptr != nullptr) << "Unable to access the vertex of a path!";
+  return ConstNode(vertex_ptr);
+}
+
+ConstUnboundRelationship ConstPath::GetRelationshipAt(size_t index) const {
+  auto edge_ptr = mg_path_relationship_at(const_ptr_, index);
+  CHECK(edge_ptr != nullptr) << "Unable to access the edge of a path!";
+  return ConstUnboundRelationship(edge_ptr);
+}
+
+bool ConstPath::IsReversedRelationshipAt(size_t index) const {
+  auto is_reversed = mg_path_relationship_reversed_at(const_ptr_, index);
+  CHECK(is_reversed != -1)
+      << "Unable to access the edge orientation of a path!";
+  return is_reversed == 1;
+}
+
+bool ConstPath::operator==(const ConstPath &other) const {
+  return ArePathsEqual(const_ptr_, other.const_ptr_);
+}
+
+bool ConstPath::operator==(const Path &other) const {
+  return ArePathsEqual(const_ptr_, other.ptr());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -272,6 +574,24 @@ Value::Value(List &&list) : Value(mg_value_make_list(list.ptr_)) {
 
 Value::Value(Map &&map) : Value(mg_value_make_map(map.ptr_)) {
   map.ptr_ = nullptr;
+}
+
+Value::Value(Node &&vertex) : Value(mg_value_make_node(vertex.ptr_)) {
+  vertex.ptr_ = nullptr;
+}
+
+Value::Value(Relationship &&edge)
+    : Value(mg_value_make_relationship(edge.ptr_)) {
+  edge.ptr_ = nullptr;
+}
+
+Value::Value(UnboundRelationship &&edge)
+    : Value(mg_value_make_unbound_relationship(edge.ptr_)) {
+  edge.ptr_ = nullptr;
+}
+
+Value::Value(Path &&path) : Value(mg_value_make_path(path.ptr_)) {
+  path.ptr_ = nullptr;
 }
 
 bool Value::ValueBool() const {
@@ -302,6 +622,26 @@ const ConstList Value::ValueList() const {
 const ConstMap Value::ValueMap() const {
   CHECK(type() == Type::Map);
   return ConstMap(mg_value_map(ptr_));
+}
+
+const ConstNode Value::ValueNode() const {
+  CHECK(type() == Type::Node);
+  return ConstNode(mg_value_node(ptr_));
+}
+
+const ConstRelationship Value::ValueRelationship() const {
+  CHECK(type() == Type::Relationship);
+  return ConstRelationship(mg_value_relationship(ptr_));
+}
+
+const ConstUnboundRelationship Value::ValueUnboundRelationship() const {
+  CHECK(type() == Type::UnboundRelationship);
+  return ConstUnboundRelationship(mg_value_unbound_relationship(ptr_));
+}
+
+const ConstPath Value::ValuePath() const {
+  CHECK(type() == Type::Path);
+  return ConstPath(mg_value_path(ptr_));
 }
 
 Value::Type Value::type() const { return ConvertType(mg_value_get_type(ptr_)); }
@@ -346,6 +686,25 @@ const ConstMap ConstValue::ValueMap() const {
   return ConstMap(mg_value_map(const_ptr_));
 }
 
+const ConstNode ConstValue::ValueNode() const {
+  CHECK(type() == Value::Type::Node);
+  return ConstNode(mg_value_node(const_ptr_));
+}
+
+const ConstRelationship ConstValue::ValueRelationship() const {
+  CHECK(type() == Value::Type::Relationship);
+  return ConstRelationship(mg_value_relationship(const_ptr_));
+}
+
+const ConstUnboundRelationship ConstValue::ValueUnboundRelationship() const {
+  CHECK(type() == Value::Type::UnboundRelationship);
+  return ConstUnboundRelationship(mg_value_unbound_relationship(const_ptr_));
+}
+
+const ConstPath ConstValue::ValuePath() const {
+  CHECK(type() == Value::Type::Path);
+  return ConstPath(mg_value_path(const_ptr_));
+}
 Value::Type ConstValue::type() const {
   return ConvertType(mg_value_get_type(const_ptr_));
 }
