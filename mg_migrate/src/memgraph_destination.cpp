@@ -1,5 +1,6 @@
 #include "memgraph_destination.hpp"
 
+#include <map>
 #include <sstream>
 
 #include <glog/logging.h>
@@ -17,19 +18,26 @@ class ParamsBuilder {
  public:
   /// Assign a new parameter name to the given `value` and returns '$'-prefixed
   /// parameter name.
-  std::string Create(const mg::Value &value) {
+  std::string Create(const mg::ConstValue &value) {
     std::string key = kParamPrefix + std::to_string(counter_++);
-    auto [_, emplaced] = params_.emplace(key, value);
+    auto [_, emplaced] = params_.emplace(key, mg::Value(value));
     CHECK(emplaced) << "Param should be successfully inserted!";
     return "$" + key;
   }
 
-  /// Returns map of all assigned parameters.
-  const std::map<std::string, mg::Value> &GetParams() const { return params_; }
+  /// Returns map of all assigned parameters. It should be called only once.
+  mg::Map GetParams() const {
+    mg::Map map(params_.size());
+    for (auto &[key, value] : params_) {
+      map.InsertUnsafe(key, std::move(value));
+    }
+    params_.clear();
+    return map;
+  }
 
  private:
-  std::map<std::string, mg::Value> params_;
   int counter_{0};
+  std::map<std::string, mg::Value> params_;
 };
 
 /// A helper function that escapes label, edge type and property names.
@@ -49,7 +57,7 @@ std::string EscapeName(const std::string_view &src) {
 }
 
 void WriteProperties(std::ostream *stream, ParamsBuilder *params,
-                     const std::map<std::string, mg::Value> &properties,
+                     const mg::ConstMap &properties,
                      std::optional<mg::Id> property_id = std::nullopt) {
   *stream << "{";
   if (property_id) {
@@ -89,7 +97,7 @@ MemgraphDestination::~MemgraphDestination() {
   }
 }
 
-void MemgraphDestination::CreateVertex(const mg::Vertex &vertex) {
+void MemgraphDestination::CreateNode(const mg::ConstNode &node) {
   if (!created_internal_index_) {
     CreateLabelPropertyIndex(kInternalVertexLabel, kInternalPropertyId);
     created_internal_index_ = true;
@@ -98,20 +106,20 @@ void MemgraphDestination::CreateVertex(const mg::Vertex &vertex) {
   ParamsBuilder params;
   std::ostringstream stream;
   stream << "CREATE (u:__mg_vertex__";
-  for (const auto &label : vertex.labels) {
+  for (const auto &label : node.labels()) {
     stream << ":" << EscapeName(label);
   }
   stream << " ";
-  WriteProperties(&stream, &params, vertex.properties, vertex.id);
+  WriteProperties(&stream, &params, node.properties(), node.id());
   stream << ");";
 
-  CHECK(client_->Execute(stream.str(), params.GetParams()))
+  CHECK(client_->Execute(stream.str(), params.GetParams().AsConstMap()))
       << "Couldn't create a vertex!";
   CHECK(!client_->FetchOne())
       << "Unexpected data received while creating a vertex!";
 }
 
-void MemgraphDestination::CreateEdge(const mg::Edge &edge) {
+void MemgraphDestination::CreateRelationship(const mg::ConstRelationship &rel) {
   CHECK(created_internal_index_)
       << "Can't create an edge when the database doesn't have any vertices!";
 
@@ -121,18 +129,19 @@ void MemgraphDestination::CreateEdge(const mg::Edge &edge) {
   stream << "(u:" << kInternalVertexLabel << "), ";
   stream << "(v:" << kInternalVertexLabel << ")";
   stream << " WHERE ";
-  stream << "u." << kInternalPropertyId << " = " << edge.from.AsInt();
+  stream << "u." << kInternalPropertyId << " = " << rel.from().AsInt();
   stream << " AND ";
-  stream << "v." << kInternalPropertyId << " = " << edge.to.AsInt();
-  stream << " CREATE (u)-[:" << EscapeName(edge.type);
-  if (!edge.properties.empty()) {
+  stream << "v." << kInternalPropertyId << " = " << rel.to().AsInt();
+  stream << " CREATE (u)-[:" << EscapeName(rel.type());
+  const auto &properties = rel.properties();
+  if (!properties.empty()) {
     stream << " ";
-    WriteProperties(&stream, &params, edge.properties);
+    WriteProperties(&stream, &params, properties);
   }
   stream << "]->(v) RETURN 1;";
 
   // Execute and make sure that exactly one edge is created.
-  CHECK(client_->Execute(stream.str(), params.GetParams()))
+  CHECK(client_->Execute(stream.str(), params.GetParams().AsConstMap()))
       << "Couldn't create an edge!";
   CHECK(client_->FetchOne()) << "Couldn't create an edge!";
   CHECK(!client_->FetchOne())

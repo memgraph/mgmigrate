@@ -18,14 +18,14 @@ class MemgraphDestination {
   MemgraphDestination &operator=(MemgraphDestination &&) = delete;
 
   /// Executes queries to remove internal index and properties on vertices.
-  /// If the `CreateVertex` method was never called, it does nothing.
+  /// If the `CreateNode` method was never called, it does nothing.
   ~MemgraphDestination();
 
-  /// Creates vertex. On the first call, additional query is executed to create
-  /// an internal index for matching nodes by the `vertex`'s id property.
-  void CreateVertex(const mg::Vertex &vertex);
+  /// Creates node. On the first call, additional query is executed to create
+  /// an internal index for matching nodes by the `node`'s id property.
+  void CreateNode(const mg::ConstNode &node);
 
-  void CreateEdge(const mg::Edge &edge);
+  void CreateRelationship(const mg::ConstRelationship &rel);
 
   void CreateLabelIndex(const std::string_view &label);
 

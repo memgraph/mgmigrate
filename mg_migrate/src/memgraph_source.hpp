@@ -30,9 +30,10 @@ class MemgraphSource {
 
   ~MemgraphSource();
 
-  void ReadVertices(std::function<void(const mg::Vertex &vertex)> callback);
+  void ReadNodes(std::function<void(const mg::ConstNode &node)> callback);
 
-  void ReadEdges(std::function<void(const mg::Edge &edge)> callback);
+  void ReadRelationships(
+      std::function<void(const mg::ConstRelationship &rel)> callback);
 
   IndexInfo ReadIndices();
 

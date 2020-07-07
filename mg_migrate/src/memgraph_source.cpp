@@ -7,26 +7,26 @@ MemgraphSource::MemgraphSource(std::unique_ptr<MemgraphClient> client)
 
 MemgraphSource::~MemgraphSource() {}
 
-void MemgraphSource::ReadVertices(
-    std::function<void(const mg::Vertex &vertex)> callback) {
+void MemgraphSource::ReadNodes(
+    std::function<void(const mg::ConstNode &node)> callback) {
   CHECK(client_->Execute("MATCH (u) RETURN u;")) << "Can't read vertices!";
   std::optional<std::vector<mg::Value>> row;
   while ((row = client_->FetchOne()) != std::nullopt) {
-    CHECK(row->size() == 1 && (*row)[0].type() == mg::Value::Type::Vertex)
+    CHECK(row->size() == 1 && (*row)[0].type() == mg::Value::Type::Node)
         << "Received unexpected result while reading vertices!";
-    callback((*row)[0].ValueVertex());
+    callback((*row)[0].ValueNode());
   }
 }
 
-void MemgraphSource::ReadEdges(
-    std::function<void(const mg::Edge &edge)> callback) {
+void MemgraphSource::ReadRelationships(
+    std::function<void(const mg::ConstRelationship &rel)> callback) {
   CHECK(client_->Execute("MATCH (u)-[e]->(v) RETURN e;"))
       << "Can't read edges!";
   std::optional<std::vector<mg::Value>> row;
   while ((row = client_->FetchOne()) != std::nullopt) {
-    CHECK(row->size() == 1 && (*row)[0].type() == mg::Value::Type::Edge)
+    CHECK(row->size() == 1 && (*row)[0].type() == mg::Value::Type::Relationship)
         << "Received unexpected result while reading edges!";
-    callback((*row)[0].ValueEdge());
+    callback((*row)[0].ValueRelationship());
   }
 }
 
@@ -41,7 +41,7 @@ MemgraphSource::IndexInfo MemgraphSource::ReadIndices() {
     const auto &type = (*row)[0].ValueString();
     const auto &label = (*row)[1].ValueString();
     if (type == "label") {
-      info.label.push_back(label);
+      info.label.emplace_back(label);
     } else if (type == "label+property") {
       CHECK((*row)[2].type() == mg::Value::Type::String);
       const auto &property = (*row)[2].ValueString();
@@ -76,7 +76,7 @@ MemgraphSource::ConstraintInfo MemgraphSource::ReadConstraints() {
       for (const auto &value : list) {
         CHECK(value.type() == mg::Value::Type::String)
             << "Received unexpected result while reading constraints!";
-        properties.insert(value.ValueString());
+        properties.emplace(value.ValueString());
       }
       info.unique.emplace_back(label, std::move(properties));
     } else {

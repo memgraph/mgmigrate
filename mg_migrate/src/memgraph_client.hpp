@@ -7,10 +7,14 @@ class MemgraphClient {
  public:
   virtual ~MemgraphClient() {}
 
+  /// Executes the `statement`. Returns true on success and false otherwise,
+  /// e.g. if there is another ongoing execution.
+  virtual bool Execute(const std::string &statement) = 0;
+
   /// Executes the `statement` supplied with `params`. Returns true on success
   /// and false otherwise, e.g. if there is another ongoing execution.
   virtual bool Execute(const std::string &statement,
-                       const std::map<std::string, mg::Value> &params = {}) = 0;
+                       const mg::ConstMap &params) = 0;
 
   /// Fetches one row from the input stream. Returns `std::nullopt` if there's
   /// nothing to fetch. This method should be called as long as `std::nullopt`
@@ -29,8 +33,12 @@ class MemgraphClientConnection : public MemgraphClient {
   MemgraphClientConnection &operator=(MemgraphClientConnection &&) = delete;
   ~MemgraphClientConnection() override {}
 
+  bool Execute(const std::string &statement) override {
+    return client_->Execute(statement);
+  }
+
   bool Execute(const std::string &statement,
-               const std::map<std::string, mg::Value> &params = {}) override {
+               const mg::ConstMap &params) override {
     return client_->Execute(statement, params);
   }
 

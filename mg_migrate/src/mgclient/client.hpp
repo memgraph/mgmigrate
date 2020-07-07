@@ -33,8 +33,14 @@ class Client {
   /// After executing the statement, the method is blocked until all incoming
   /// data (execution results) are handled, i.e. until `FetchOne` method returns
   /// `std::nullopt`.
-  bool Execute(const std::string &statement,
-               const std::map<std::string, Value> &params = {});
+  bool Execute(const std::string &statement);
+
+  /// Executes the given Cypher `statement`, supplied with additional `params`.
+  /// Returns true when the statement is successfully executed, false otherwise.
+  /// After executing the statement, the method is blocked until all incoming
+  /// data (execution results) are handled, i.e. until `FetchOne` method returns
+  /// `std::nullopt`.
+  bool Execute(const std::string &statement, const ConstMap &params);
 
   /// Fetches the next result from the input stream.
   /// If there is nothing to fetch, `std::nullopt` is returned.

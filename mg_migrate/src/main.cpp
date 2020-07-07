@@ -48,13 +48,14 @@ bool DoEndpointsMatch(const std::string_view &host1, uint16_t port1,
 /// Memgraph database.
 void MigrateMemgraphDatabase(MemgraphSource *source,
                              MemgraphDestination *destination) {
-  // Migrate vertices.
-  source->ReadVertices(
-      [&destination](const auto &vertex) { destination->CreateVertex(vertex); });
+  // Migrate nodes.
+  source->ReadNodes(
+      [&destination](const auto &node) { destination->CreateNode(node); });
 
-  // Migrate edges.
-  source->ReadEdges(
-      [&destination](const auto &edge) { destination->CreateEdge(edge); });
+  // Migrate relationships.
+  source->ReadRelationships([&destination](const auto &rel) {
+    destination->CreateRelationship(rel);
+  });
 
   // Migrate indices.
   const auto &index_info = source->ReadIndices();
