@@ -32,6 +32,9 @@ include(ExternalProject)
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
+# Setup PostgreSQL
+find_package(PostgreSQL REQUIRED)
+
 # Setup gflags
 set(GFLAGS_ROOT ${PROJECT_BINARY_DIR}/gflags)
 ExternalProject_Add(gflags-proj
@@ -95,6 +98,31 @@ set_target_properties(mgclient PROPERTIES
   IMPORTED_LOCATION ${MG_CLIENT_LIBRARY_PATH}
   INTERFACE_LINK_LIBRARIES "${OPENSSL_LIBRARIES}")
 add_dependencies(mgclient mgclient-proj)
+
+# Setup pqxx
+# Note: there is package libpqxx-dev, outdated and not compatible with C++17
+set(PQXX_ROOT ${PROJECT_BINARY_DIR}/pqxx)
+ExternalProject_Add(pqxx-proj
+  PREFIX            ${PQXX_ROOT}
+  INSTALL_DIR       ${PQXX_ROOT}
+  GIT_REPOSITORY    https://github.com/jtv/libpqxx.git
+  GIT_TAG           7.1.2
+  CMAKE_ARGS        "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
+  "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+  "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+  "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+  "-DBUILD_TEST=OFF")
+
+set(PQXX_INCLUDE_DIR ${PQXX_ROOT}/include)
+set(PQXX_LIBRARY_PATH ${PQXX_ROOT}/lib/${CMAKE_FIND_LIBRARY_PREFIXES}pqxx.a)
+add_library(pqxx STATIC IMPORTED)
+set_target_properties(pqxx PROPERTIES
+  IMPORTED_LOCATION ${PQXX_LIBRARY_PATH}
+  INTERFACE_LINK_LIBRARIES "${OPENSSL_LIBRARIES}")
+add_dependencies(pqxx pqxx-proj)
+
+include_directories(${PQXX_INCLUDE_DIR})
+
 
 # Setup gtest
 set(GTEST_ROOT ${PROJECT_BINARY_DIR}/gtest)

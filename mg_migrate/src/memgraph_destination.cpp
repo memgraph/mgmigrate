@@ -26,7 +26,7 @@ class ParamsBuilder {
   }
 
   /// Returns map of all assigned parameters. It should be called only once.
-  mg::Map GetParams() const {
+  mg::Map GetParams() {
     mg::Map map(params_.size());
     for (auto &[key, value] : params_) {
       map.InsertUnsafe(key, std::move(value));
