@@ -57,14 +57,22 @@ std::string EscapeName(const std::string_view &src) {
 }
 
 void WriteProperties(std::ostream *stream, ParamsBuilder *params,
-                     const mg::ConstMap &properties,
-                     std::optional<mg::Id> property_id = std::nullopt) {
+                     const mg::ConstMap &properties) {
   *stream << "{";
-  if (property_id) {
-    *stream << kInternalPropertyId << ": " << property_id->AsInt();
-    if (!properties.empty()) {
-      *stream << ", ";
-    }
+  utils::PrintIterable(
+      *stream, properties, ", ", [&params](auto &os, const auto &item) {
+        os << EscapeName(item.first) << ": " << params->Create(item.second);
+      });
+  *stream << "}";
+}
+
+void WritePropertiesWithId(std::ostream *stream, ParamsBuilder *params,
+                           const mg::ConstMap &properties,
+                           const mg::ConstValue &property_id) {
+  *stream << "{";
+  *stream << kInternalPropertyId << ": " << params->Create(property_id);
+  if (!properties.empty()) {
+    *stream << ", ";
   }
   utils::PrintIterable(
       *stream, properties, ", ", [&params](auto &os, const auto &item) {
@@ -97,7 +105,9 @@ MemgraphDestination::~MemgraphDestination() {
   }
 }
 
-void MemgraphDestination::CreateNode(const mg::ConstNode &node) {
+void MemgraphDestination::CreateNode(const mg::ConstValue &id,
+                                     const std::set<std::string> &labels,
+                                     const mg::ConstMap &properties) {
   if (!created_internal_index_) {
     CreateLabelPropertyIndex(kInternalVertexLabel, kInternalPropertyId);
     created_internal_index_ = true;
@@ -106,11 +116,11 @@ void MemgraphDestination::CreateNode(const mg::ConstNode &node) {
   ParamsBuilder params;
   std::ostringstream stream;
   stream << "CREATE (u:__mg_vertex__";
-  for (const auto &label : node.labels()) {
+  for (const auto &label : labels) {
     stream << ":" << EscapeName(label);
   }
   stream << " ";
-  WriteProperties(&stream, &params, node.properties(), node.id());
+  WritePropertiesWithId(&stream, &params, properties, id);
   stream << ");";
 
   CHECK(client_->Execute(stream.str(), params.GetParams().AsConstMap()))

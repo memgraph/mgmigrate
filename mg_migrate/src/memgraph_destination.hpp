@@ -22,8 +22,9 @@ class MemgraphDestination {
   ~MemgraphDestination();
 
   /// Creates node. On the first call, additional query is executed to create
-  /// an internal index for matching nodes by the `node`'s id property.
-  void CreateNode(const mg::ConstNode &node);
+  /// an internal index for matching nodes by the given `id`.
+  void CreateNode(const mg::ConstValue &id, const std::set<std::string> &labels,
+                  const mg::ConstMap &properties);
 
   void CreateRelationship(const mg::ConstRelationship &rel);
 

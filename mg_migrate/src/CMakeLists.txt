@@ -9,7 +9,7 @@ include_directories(
 set(MG_MIGRATE_LIB_SOURCES
   memgraph_destination.cpp
   memgraph_source.cpp
-  postgresql_client.cpp)
+  postgresql.cpp)
 
 add_compile_options(-Wall -Wextra -Wredundant-move)
 

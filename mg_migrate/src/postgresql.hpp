@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include <pqxx/pqxx>
@@ -67,6 +68,16 @@ class PostgresqlClient {
   /// All PostgreSQL value types are converted to `mg::Value` in this step.
   std::optional<std::vector<mg::Value>> FetchOne();
 
+  /// Escapes string for use as SQL string literal.
+  std::string Escape(const std::string_view &text) const {
+    return connection_->esc(text);
+  }
+
+  /// Escapes string for use as SQL identifier.
+  std::string EscapeName(const std::string_view &text) const {
+    return connection_->quote_name(text);
+  }
+
   /// Static method that creates a PostgreSQL client instance.
   /// If the connection couldn't be established, it returns a `nullptr`.
   static std::unique_ptr<PostgresqlClient> Connect(const Params &params);
@@ -80,4 +91,33 @@ class PostgresqlClient {
   // Execution context:
   std::optional<pqxx::work> work_;
   std::optional<pqxx::icursorstream> cursor_;
+};
+
+/// Class that reads from the PostgreSQL database.
+class PostgresqlSource {
+ public:
+  struct Table {
+    std::string name;
+    std::vector<std::string> columns;
+  };
+
+  explicit PostgresqlSource(std::unique_ptr<PostgresqlClient> client);
+
+  PostgresqlSource(const PostgresqlSource &) = delete;
+  PostgresqlSource(PostgresqlSource &&) = default;
+  PostgresqlSource &operator=(const PostgresqlSource &) = delete;
+  PostgresqlSource &operator=(PostgresqlSource &&) = delete;
+
+  ~PostgresqlSource();
+
+  /// Lists all tables in the 'public' schema.
+  std::vector<Table> GetTables();
+
+  /// Reads the given `table` row by row. Order of returned values corresponds
+  /// to the order of columns listed in the `table`.
+  void ReadTable(const Table &table,
+                 std::function<void(const std::vector<mg::Value> &)> callback);
+
+ private:
+  std::unique_ptr<PostgresqlClient> client_;
 };
