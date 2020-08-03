@@ -93,14 +93,33 @@ class PostgresqlClient {
   std::optional<pqxx::icursorstream> cursor_;
 };
 
-/// Class that reads from the PostgreSQL database.
-class PostgresqlSource {
- public:
+struct SchemaInfo {
   struct Table {
     std::string name;
     std::vector<std::string> columns;
+    std::vector<size_t> primary_key;
+    std::vector<size_t> foreign_keys;
+
+    /// Indicates whether there's a foreign key referencing this table's primary
+    /// key.
+    bool primary_key_referenced;
   };
 
+  struct ForeignKey {
+    std::string name;
+    size_t child_table;
+    size_t parent_table;
+    std::vector<size_t> child_columns;
+    std::vector<size_t> parent_columns;
+  };
+
+  std::vector<Table> tables;
+  std::vector<ForeignKey> foreign_keys;
+};
+
+/// Class that reads from the PostgreSQL database.
+class PostgresqlSource {
+ public:
   explicit PostgresqlSource(std::unique_ptr<PostgresqlClient> client);
 
   PostgresqlSource(const PostgresqlSource &) = delete;
@@ -110,12 +129,13 @@ class PostgresqlSource {
 
   ~PostgresqlSource();
 
-  /// Lists all tables in the 'public' schema.
-  std::vector<Table> GetTables();
+  /// Returns structure of the 'public' schema.
+  SchemaInfo GetSchemaInfo();
 
   /// Reads the given `table` row by row. Order of returned values corresponds
-  /// to the order of columns listed in the `table`.
-  void ReadTable(const Table &table,
+  /// to the order of columns listed in the `table`. If `distinct` is set to
+  /// `true`, duplicates will be skipped.
+  void ReadTable(const SchemaInfo::Table &table,
                  std::function<void(const std::vector<mg::Value> &)> callback);
 
  private:

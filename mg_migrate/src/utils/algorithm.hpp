@@ -62,4 +62,18 @@ inline void PrintIterable(TStream &stream, const TIterable &iterable,
                 [](auto &stream, const auto &item) { stream << item; });
 }
 
+/**
+ * Returns `true` if the given iterable contains the given element.
+ *
+ * @param iterable An iterable collection of values.
+ * @param element The sought element.
+ * @return `true` if element is contained in iterable.
+ * @tparam TIiterable type of iterable.
+ * @tparam TElement type of element.
+ */
+template <typename TIterable, typename TElement>
+inline bool Contains(const TIterable &iterable, const TElement &element) {
+  return std::find(iterable.begin(), iterable.end(), element) != iterable.end();
+}
+
 }  // namespace utils

@@ -7,40 +7,41 @@
 
 #include "memgraph_client.hpp"
 
-/// Class that writes to the destination Memgraph database.
-class MemgraphDestination {
- public:
-  explicit MemgraphDestination(std::unique_ptr<MemgraphClient> client);
+void CreateNode(MemgraphClient *client, const std::set<std::string> &labels,
+                const mg::ConstMap &properties);
 
-  MemgraphDestination(const MemgraphDestination &) = delete;
-  MemgraphDestination(MemgraphDestination &&) = default;
-  MemgraphDestination &operator=(const MemgraphDestination &) = delete;
-  MemgraphDestination &operator=(MemgraphDestination &&) = delete;
+// Creates relationships between nodes that are matched by label and property
+// set (id). If `use_merge` is set to true, it won't create already existing
+// relationships between nodes. It returns a number of created/merged
+// relationships.
+size_t CreateRelationships(
+    MemgraphClient *client, const std::string_view &label1,
+    const mg::ConstMap &id1, const std::string_view &label2,
+    const mg::ConstMap &id2, const std::string_view &edge_type,
+    const mg::ConstMap &properties, bool use_merge = false);
 
-  /// Executes queries to remove internal index and properties on vertices.
-  /// If the `CreateNode` method was never called, it does nothing.
-  ~MemgraphDestination();
+void CreateLabelIndex(MemgraphClient *client, const std::string_view &label);
 
-  /// Creates node. On the first call, additional query is executed to create
-  /// an internal index for matching nodes by the given `id`.
-  void CreateNode(const mg::ConstValue &id, const std::set<std::string> &labels,
-                  const mg::ConstMap &properties);
+void CreateLabelPropertyIndex(MemgraphClient *client,
+                              const std::string_view &label,
+                              const std::string_view &property);
 
-  void CreateRelationship(const mg::ConstRelationship &rel);
+void CreateExistenceConstraint(MemgraphClient *client,
+                               const std::string_view &label,
+                               const std::string_view &property);
 
-  void CreateLabelIndex(const std::string_view &label);
+void CreateUniqueConstraint(MemgraphClient *client,
+                            const std::string_view &label,
+                            const std::set<std::string> &properties);
 
-  void CreateLabelPropertyIndex(const std::string_view &label,
-                                const std::string_view &property);
+void DropLabelIndex(MemgraphClient *client, const std::string_view &label);
 
-  void CreateExistenceConstraint(const std::string_view &label,
-                                 const std::string_view &property);
+void DropLabelPropertyIndex(MemgraphClient *client,
+                            const std::string_view &label,
+                            const std::string_view &property);
 
-  void CreateUniqueConstraint(const std::string_view &label,
-                              const std::set<std::string> &properties);
+void RemoveLabelFromNodes(MemgraphClient *client,
+                          const std::string_view &label);
 
- private:
-  std::unique_ptr<MemgraphClient> client_;
-
-  bool created_internal_index_{false};
-};
+void RemovePropertyFromNodes(MemgraphClient *client,
+                             const std::string_view &property);
