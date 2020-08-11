@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 #include <sstream>
+#include <stack>
 #include <string_view>
 #include <vector>
 
@@ -16,15 +17,69 @@ namespace {
 // TODO(tsabolcec): Make this configurable from command line.
 const char *kDefaultScheme = "public";
 
+/// A helper function which parses SQL string array (possibly multidimensional)
+/// into a single `mg::Value` type. `conversion` lambda is used to convert a
+/// single string element of an array into a `mg::Value` type.
+mg::Value ParseArray(
+    const pqxx::field &field,
+    std::function<mg::Value(const std::string &element)> conversion) {
+  // Array can be multidimensional, so we use stack to parse it. The first
+  // `std::vector` in the stack will be used to store the final result.
+  std::stack<std::vector<mg::Value>> stack;
+  stack.push(std::vector<mg::Value>());
+
+  auto parser = field.as_array();
+  for (auto item = parser.get_next();
+       item.first != pqxx::array_parser::juncture::done;
+       item = parser.get_next()) {
+    switch (item.first) {
+      case pqxx::array_parser::juncture::row_start: {
+        stack.push(std::vector<mg::Value>());
+        break;
+      }
+      case pqxx::array_parser::juncture::row_end: {
+        CHECK(stack.size() >= 2) << "Unexpected row end encountered while "
+                                    "parsing a PostgreSQL array!";
+        mg::Value array_value(mg::List(std::move(stack.top())));
+        stack.pop();
+        stack.top().push_back(std::move(array_value));
+        break;
+      }
+      case pqxx::array_parser::juncture::string_value: {
+        CHECK(!stack.empty()) << "Unexpected string value encountered while "
+                                 "parsing a PostgreSQL array!";
+        stack.top().push_back(conversion(item.second));
+        break;
+      }
+      case pqxx::array_parser::juncture::null_value: {
+        CHECK(!stack.empty()) << "Unexpected null value encountered while "
+                                 "parsing a PostgreSQL array!";
+        stack.top().push_back(mg::Value());
+        break;
+      }
+      case pqxx::array_parser::juncture::done:
+        break;
+    }
+  }
+
+  // At the end there should be only one `std::vector` left in the stack,
+  // containing a single element.
+  CHECK(stack.size() == 1 && stack.top().size() == 1)
+      << "Got unexpected result while parsing a PostgreSQL array!";
+  return stack.top()[0];
+}
+
 /// Converts pqxx::field to mg::Value. Types of pqxx::values are represented as
 /// integers internally known to postgres server. Correct mapping can be found
 /// at: https://godoc.org/github.com/lib/pq/oid. The same list can be obtained
 /// by running `SELECT typname, oid FROM pg_type`.
 mg::Value ConvertField(const pqxx::field &field) {
+  if (field.is_null()) {
+    return mg::Value();
+  }
   switch (field.type()) {
     case PostgresqlOidType::kBool:
       return mg::Value(field.as<bool>());
-    case PostgresqlOidType::kByte:
     case PostgresqlOidType::kInt8:
     case PostgresqlOidType::kInt2:
     case PostgresqlOidType::kInt4:
@@ -37,7 +92,33 @@ mg::Value ConvertField(const pqxx::field &field) {
     case PostgresqlOidType::kFloat8:
     case PostgresqlOidType::kNumeric:
       return mg::Value(field.as<double>());
-      // TODO(tsabolcec): Implement conversion of lists and maps (JSON) as well.
+    case PostgresqlOidType::kBoolArray:
+      return ParseArray(field, [](const auto &el) {
+        bool el_bool;
+        pqxx::from_string(el, el_bool);
+        return mg::Value(el_bool);
+      });
+    case PostgresqlOidType::kInt8Array:
+    case PostgresqlOidType::kInt2Array:
+    case PostgresqlOidType::kInt4Array:
+      return ParseArray(field, [](const auto &el) {
+        int64_t el_int;
+        pqxx::from_string(el, el_int);
+        return mg::Value(el_int);
+      });
+    case PostgresqlOidType::kFloat4Array:
+    case PostgresqlOidType::kFloat8Array:
+    case PostgresqlOidType::kNumericArray:
+      return ParseArray(field, [](const auto &el) {
+        double el_double;
+        pqxx::from_string(el, el_double);
+        return mg::Value(el_double);
+      });
+    case PostgresqlOidType::kCharArray:
+    case PostgresqlOidType::kBlankPaddedCharArray:
+    case PostgresqlOidType::kVarcharArray:
+    case PostgresqlOidType::kTextArray:
+      return ParseArray(field, [](const auto &el) { return mg::Value(el); });
   }
   // Most values are readable in string format:
   return mg::Value(field.as<std::string>());
@@ -200,6 +281,75 @@ std::vector<SchemaInfo::ForeignKey> ListAllForeignKeys(
   return foreign_keys;
 }
 
+std::vector<SchemaInfo::ExistenceConstraint> ListAllExistenceConstraints(
+    PostgresqlClient *client, const std::vector<SchemaInfo::Table> &tables) {
+  std::string statement =
+      "SELECT table_name, column_name FROM information_schema.columns "
+      "WHERE table_schema = '" +
+      client->Escape(kDefaultScheme) + "' AND is_nullable = 'NO';";
+  CHECK(client->Execute(statement)) << "Unable to list existence constraints!";
+  std::optional<std::vector<mg::Value>> result;
+  std::vector<SchemaInfo::ExistenceConstraint> existence_constraints;
+  while ((result = client->FetchOne()) != std::nullopt) {
+    CHECK(result->size() == 2)
+        << "Received unexpected result while listing existence constraints!";
+    for (const auto &value : *result) {
+      CHECK(value.type() == mg::Value::Type::String)
+          << "Received unexpected result while listing existence constraints!";
+    }
+    const auto table = GetTableIndex(tables, (*result)[0].ValueString());
+    const auto column =
+        GetColumnIndex(tables[table].columns, (*result)[1].ValueString());
+    existence_constraints.emplace_back(table, column);
+  }
+  return existence_constraints;
+}
+
+std::vector<SchemaInfo::UniqueConstraint> ListAllUniqueConstraints(
+    PostgresqlClient *client, std::vector<SchemaInfo::Table> &tables) {
+  std::string statement =
+      "SELECT"
+      "  tc.constraint_name,"
+      "  tc.table_name,"
+      "  ccu.column_name "
+      "FROM"
+      "  information_schema.table_constraints AS tc"
+      "  JOIN information_schema.constraint_column_usage AS ccu"
+      "    USING (constraint_name, table_schema) "
+      "WHERE tc.constraint_type IN ('UNIQUE', 'PRIMARY KEY') "
+      "ORDER BY tc.constraint_name";
+  CHECK(client->Execute(statement)) << "Unable to list unique constraints!";
+  std::optional<std::vector<mg::Value>> result;
+  std::vector<SchemaInfo::UniqueConstraint> constraints;
+  SchemaInfo::UniqueConstraint current_constraint;
+  std::string prev_constraint_name;
+  while ((result = client->FetchOne()) != std::nullopt) {
+    CHECK(result->size() == 3)
+        << "Received unexpected result while listing unique constraints!";
+    for (const auto &value : *result) {
+      CHECK(value.type() == mg::Value::Type::String)
+          << "Received unexpected result while listing unique constraints!";
+    }
+    const auto &constraint_name = (*result)[0].ValueString();
+    auto table = GetTableIndex(tables, (*result)[1].ValueString());
+    auto column =
+        GetColumnIndex(tables[table].columns, (*result)[2].ValueString());
+    if (prev_constraint_name != constraint_name) {
+      if (!current_constraint.second.empty()) {
+        constraints.push_back(current_constraint);
+        current_constraint.second.clear();
+      }
+      current_constraint.first = table;
+    }
+    current_constraint.second.push_back(column);
+    prev_constraint_name = constraint_name;
+  }
+  if (!current_constraint.second.empty()) {
+    constraints.push_back(current_constraint);
+  }
+  return constraints;
+}
+
 }  // namespace
 
 bool PostgresqlClient::Execute(const std::string &statement) {
@@ -294,7 +444,12 @@ SchemaInfo PostgresqlSource::GetSchemaInfo() {
     tables[foreign_keys[i].parent_table].primary_key_referenced = true;
   }
 
-  return {std::move(tables), std::move(foreign_keys)};
+  auto existence_constraints =
+      ListAllExistenceConstraints(client_.get(), tables);
+  auto unique_constraints = ListAllUniqueConstraints(client_.get(), tables);
+
+  return {std::move(tables), std::move(foreign_keys),
+          std::move(unique_constraints), std::move(existence_constraints)};
 }
 
 void PostgresqlSource::ReadTable(

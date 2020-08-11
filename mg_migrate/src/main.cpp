@@ -152,6 +152,17 @@ mg::Map ConstructForeignKeyMatcher(const SchemaInfo &schema,
   return properties;
 }
 
+/// Helper function that checks whether the `properties` corresponds to a well
+/// defined foreign key (which doesn't contain any null values).
+bool IsForeignKeyMatcherWellDefined(const mg::ConstMap &properties) {
+  for (const auto &[_, value] : properties) {
+    if (value.type() == mg::Value::Type::Null) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /// A relationship table consists of exactly two foreign keys and there exists
 /// a foreign key referencing the table's primary key.
 bool IsTableRelationship(const SchemaInfo::Table &table) {
@@ -204,59 +215,64 @@ void MigratePostgresqlDatabase(PostgresqlSource *source,
                                 &table](const auto &row) {
         const auto &foreign_key1 = schema.foreign_keys[table.foreign_keys[0]];
         const auto &foreign_key2 = schema.foreign_keys[table.foreign_keys[1]];
-        const auto &label1 = schema.tables[foreign_key1.parent_table].name;
-        const auto &label2 = schema.tables[foreign_key2.parent_table].name;
         const auto id1(
             std::move(ConstructForeignKeyMatcher(schema, foreign_key1, row)));
         const auto id2(
             std::move(ConstructForeignKeyMatcher(schema, foreign_key2, row)));
-        const auto &edge_type = table.name;
-        mg::Map properties(row.size());
-        for (size_t i = 0; i < row.size(); ++i) {
-          if (!utils::Contains(foreign_key1.child_columns, i) &&
-              !utils::Contains(foreign_key2.child_columns, i)) {
-            properties.InsertUnsafe(table.columns[i], row[i]);
+        if (IsForeignKeyMatcherWellDefined(id1.AsConstMap()) &&
+            IsForeignKeyMatcherWellDefined(id2.AsConstMap())) {
+          const auto &label1 = schema.tables[foreign_key1.parent_table].name;
+          const auto &label2 = schema.tables[foreign_key2.parent_table].name;
+          const auto &edge_type = table.name;
+          mg::Map properties(row.size());
+          for (size_t i = 0; i < row.size(); ++i) {
+            if (!utils::Contains(foreign_key1.child_columns, i) &&
+                !utils::Contains(foreign_key2.child_columns, i)) {
+              properties.InsertUnsafe(table.columns[i], row[i]);
+            }
           }
+          CHECK(CreateRelationships(destination, label1, id1.AsConstMap(),
+                                    label2, id2.AsConstMap(), edge_type,
+                                    properties.AsConstMap()) == 1)
+              << "Unexpected number of relationships created!";
         }
-        CHECK(CreateRelationships(destination, label1, id1.AsConstMap(), label2,
-                                  id2.AsConstMap(), edge_type,
-                                  properties.AsConstMap()) == 1)
-            << "Unexpected number of relationships created!";
       });
     } else {
-      source->ReadTable(
-          table, [&destination, &schema, &table](const auto &row) {
-            const auto &label1 = table.name;
-            mg::Map id1(row.size());
+      source->ReadTable(table, [&destination, &schema,
+                                &table](const auto &row) {
+        const auto &label1 = table.name;
+        mg::Map id1(row.size());
+        if (!table.primary_key.empty()) {
+          for (const auto pos : table.primary_key) {
+            id1.InsertUnsafe(table.columns[pos], row[pos]);
+          }
+        } else {
+          // If there is no primary key, use all columns to match a node.
+          for (size_t i = 0; i < row.size(); ++i) {
+            id1.InsertUnsafe(table.columns[i], row[i]);
+          }
+        }
+        for (const auto &fk_pos : table.foreign_keys) {
+          const auto &foreign_key = schema.foreign_keys[fk_pos];
+          const auto id2(
+              std::move(ConstructForeignKeyMatcher(schema, foreign_key, row)));
+          if (IsForeignKeyMatcherWellDefined(id2.AsConstMap())) {
+            const auto &label2 = schema.tables[foreign_key.parent_table].name;
+            const std::string edge_type = label1 + "_to_" + label2;
+            // If there is no primary key, use `MERGE` instead of `CREATE` to
+            // prevent creating duplicate relationships.
+            const bool use_merge = table.primary_key.empty();
+            const auto rels_created = CreateRelationships(
+                destination, label1, id1.AsConstMap(), label2, id2.AsConstMap(),
+                edge_type, mg::Map(static_cast<size_t>(0)).AsConstMap(),
+                use_merge);
             if (!table.primary_key.empty()) {
-              for (const auto pos : table.primary_key) {
-                id1.InsertUnsafe(table.columns[pos], row[pos]);
-              }
-            } else {
-              // If there is no primary key, use all columns to match a node.
-              for (size_t i = 0; i < row.size(); ++i) {
-                id1.InsertUnsafe(table.columns[i], row[i]);
-              }
+              CHECK(rels_created == 1)
+                  << "Unexpected number of relationships created!";
             }
-            for (const auto &fk_pos : table.foreign_keys) {
-              const auto &foreign_key = schema.foreign_keys[fk_pos];
-              const auto &label2 = schema.tables[foreign_key.parent_table].name;
-              const auto id2(std::move(
-                  ConstructForeignKeyMatcher(schema, foreign_key, row)));
-              const auto &edge_type = foreign_key.name;
-              // If there is no primary key, use `MERGE` instead of `CREATE` to
-              // prevent creating duplicate relationships.
-              const bool use_merge = table.primary_key.empty();
-              const auto rels_created = CreateRelationships(
-                  destination, label1, id1.AsConstMap(), label2,
-                  id2.AsConstMap(), edge_type,
-                  mg::Map(static_cast<size_t>(0)).AsConstMap(), use_merge);
-              if (!table.primary_key.empty()) {
-                CHECK(rels_created == 1)
-                    << "Unexpected number of relationships created!";
-              }
-            }
-          });
+          }
+        }
+      });
     }
   }
 
@@ -268,6 +284,22 @@ void MigratePostgresqlDatabase(PostgresqlSource *source,
     } else {
       DropLabelIndex(destination, table.name);
     }
+  }
+
+  // Migrate constraints.
+  for (const auto &constraint : schema.existence_constraints) {
+    const auto &table_name = schema.tables[constraint.first].name;
+    const auto &column_name =
+        schema.tables[constraint.first].columns[constraint.second];
+    CreateExistenceConstraint(destination, table_name, column_name);
+  }
+  for (const auto &constraint : schema.unique_constraints) {
+    const auto &table_name = schema.tables[constraint.first].name;
+    std::set<std::string> column_names;
+    for (const auto &column_pos : constraint.second) {
+      column_names.insert(schema.tables[constraint.first].columns[column_pos]);
+    }
+    CreateUniqueConstraint(destination, table_name, column_names);
   }
 }
 

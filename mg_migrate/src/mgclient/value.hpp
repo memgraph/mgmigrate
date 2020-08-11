@@ -100,6 +100,10 @@ class List final {
 
   explicit List(size_t capacity) : List(mg_list_make_empty(capacity)) {}
 
+  explicit List(const std::vector<mg::Value> &values);
+
+  explicit List(std::vector<mg::Value> &&values);
+
   List(std::initializer_list<Value> list);
 
   size_t size() const { return mg_list_size(ptr_); }

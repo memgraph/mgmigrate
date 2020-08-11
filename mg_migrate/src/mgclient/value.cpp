@@ -227,9 +227,21 @@ List::~List() {
 
 List::List(const ConstList &list) : ptr_(mg_list_copy(list.ptr())) {}
 
-List::List(std::initializer_list<Value> list) : List(list.size()) {
-  for (const auto &value : list) {
-    Append(value.AsConstValue());
+List::List(const std::vector<mg::Value> &values) : List(values.size()) {
+  for (const auto &value : values) {
+    Append(value);
+  }
+}
+
+List::List(std::vector<mg::Value> &&values) : List(values.size()) {
+  for (auto &value : values) {
+    Append(std::move(value));
+  }
+}
+
+List::List(std::initializer_list<Value> values) : List(values.size()) {
+  for (const auto &value : values) {
+    Append(value);
   }
 }
 

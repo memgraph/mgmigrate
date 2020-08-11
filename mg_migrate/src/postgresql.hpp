@@ -21,7 +21,6 @@
 // Using `enum` instead of `enum class` for implicit conversion to int.
 enum PostgresqlOidType {
   kBool = 16,
-  kByte = 17,
   kChar = 18,
   kInt8 = 20,
   kInt2 = 21,
@@ -29,7 +28,18 @@ enum PostgresqlOidType {
   kText = 25,
   kFloat4 = 700,
   kFloat8 = 701,
+  kBoolArray = 1000,
+  kCharArray = 1002,
+  kInt2Array = 1005,
+  kInt4Array = 1007,
+  kTextArray = 1009,
+  kBlankPaddedCharArray = 1014,  // bpchar
+  kVarcharArray = 1015,
+  kInt8Array = 1016,
+  kFloat4Array = 1021,
+  kFloat8Array = 1022,
   kVarchar = 1043,
+  kNumericArray = 1231,
   kNumeric = 1700,
 };
 
@@ -113,8 +123,16 @@ struct SchemaInfo {
     std::vector<size_t> parent_columns;
   };
 
+  /// Pair of table and list of its columns.
+  using UniqueConstraint = std::pair<size_t, std::vector<size_t>>;
+
+  /// Pair of table and its column.
+  using ExistenceConstraint = std::pair<size_t, size_t>;
+
   std::vector<Table> tables;
   std::vector<ForeignKey> foreign_keys;
+  std::vector<UniqueConstraint> unique_constraints;
+  std::vector<ExistenceConstraint> existence_constraints;
 };
 
 /// Class that reads from the PostgreSQL database.
