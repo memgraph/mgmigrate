@@ -105,6 +105,7 @@ class PostgresqlClient {
 
 struct SchemaInfo {
   struct Table {
+    std::string schema;
     std::string name;
     std::vector<std::string> columns;
     std::vector<size_t> primary_key;
@@ -116,7 +117,6 @@ struct SchemaInfo {
   };
 
   struct ForeignKey {
-    std::string name;
     size_t child_table;
     size_t parent_table;
     std::vector<size_t> child_columns;

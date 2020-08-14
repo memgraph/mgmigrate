@@ -14,8 +14,8 @@
 
 namespace {
 
-// TODO(tsabolcec): Make this configurable from command line.
-const char *kDefaultScheme = "public";
+/// SQL list of schema names that shouldn't be migrated.
+const std::string kSchemaBlacklist = "('information_schema', 'pg_catalog')";
 
 /// A helper function which parses SQL string array (possibly multidimensional)
 /// into a single `mg::Value` type. `conversion` lambda is used to convert a
@@ -133,35 +133,43 @@ std::vector<mg::Value> ConvertRow(const pqxx::row &row) {
   return values;
 }
 
-std::vector<std::string> ListAllTables(PostgresqlClient *client) {
+/// Returns list of pairs, where the first element in the pair corresponds to a
+/// table schema and the second to a table name.
+std::vector<std::pair<std::string, std::string>> ListAllTables(
+    PostgresqlClient *client) {
   const std::string statement =
-      "SELECT table_name FROM information_schema.tables "
-      "WHERE table_type = 'BASE TABLE' AND table_schema='" +
-      client->Escape(kDefaultScheme) + "';";
+      "SELECT table_schema, table_name "
+      "FROM information_schema.tables "
+      "WHERE table_type = 'BASE TABLE'"
+      "  AND table_schema NOT IN " +
+      kSchemaBlacklist;
   CHECK(client->Execute(statement)) << "Unable to list all tables!";
-  std::vector<std::string> tables;
+  std::vector<std::pair<std::string, std::string>> tables;
   std::optional<std::vector<mg::Value>> result;
   while ((result = client->FetchOne()) != std::nullopt) {
-    CHECK(result->size() == 1)
-        << "Received unexpected result while listing tables in schema '"
-        << kDefaultScheme << "'!";
-    const auto &value = (*result)[0];
-    CHECK(value.type() == mg::Value::Type::String)
-        << "Received unexpected result while listing tables in schema '"
-        << kDefaultScheme << "'!";
-    tables.emplace_back(value.ValueString());
+    CHECK(result->size() == 2)
+        << "Received unexpected result while listing tables!";
+    for (const auto &value : *result) {
+      CHECK(value.type() == mg::Value::Type::String)
+          << "Received unexpected result while listing tables!";
+    }
+    const auto &table_schema = (*result)[0].ValueString();
+    const auto &table_name = (*result)[1].ValueString();
+    tables.emplace_back(std::move(table_schema), std::move(table_name));
   }
   return tables;
 }
 
 size_t GetTableIndex(const std::vector<SchemaInfo::Table> &tables,
+                     const std::string_view &table_schema,
                      const std::string_view &table_name) {
   for (size_t i = 0; i < tables.size(); ++i) {
-    if (tables[i].name == table_name) {
+    if (tables[i].schema == table_schema && tables[i].name == table_name) {
       return i;
     }
   }
-  CHECK(false) << "Couldn't find table name '" << table_name << "'!";
+  CHECK(false) << "Couldn't find table name '" << table_name << "' in schema '"
+               << table_schema << "'!";
   return 0;
 }
 
@@ -173,32 +181,35 @@ size_t GetColumnIndex(const std::vector<std::string> &columns,
   return it - columns.begin();
 }
 
-std::vector<std::string> ListColumnsForTable(PostgresqlClient *client,
-                                             const std::string_view &table) {
+std::vector<std::string> ListColumnsForTable(
+    PostgresqlClient *client, const std::string_view &table_schema,
+    const std::string_view &table_name) {
   const std::string statement =
       "SELECT column_name FROM information_schema.columns WHERE "
       "table_schema='" +
-      client->Escape(kDefaultScheme) + "' AND table_name='" +
-      client->Escape(table) + "';";
+      client->Escape(table_schema) + "' AND table_name='" +
+      client->Escape(table_name) + "';";
   CHECK(client->Execute(statement))
-      << "Unable to list columns of table '" << table << "'!";
+      << "Unable to list columns of table '" << table_name << "' in schema '"
+      << table_schema << "'!";
   std::vector<std::string> columns;
   std::optional<std::vector<mg::Value>> result;
   while ((result = client->FetchOne()) != std::nullopt) {
     CHECK(result->size() == 1)
         << "Received unexpected result while listing columns of table '"
-        << table << "'!";
+        << table_name << "' in schema '" << table_schema << "'!";
     const auto &value = (*result)[0];
     CHECK(value.type() == mg::Value::Type::String)
         << "Received unexpected result while listing columns of table '"
-        << table << "'!";
+        << table_name << "' in schema '" << table_schema << "'!";
     columns.emplace_back(value.ValueString());
   }
   return columns;
 }
 
-std::vector<std::string> GetPrimaryKeyForTable(PostgresqlClient *client,
-                                               const std::string_view &table) {
+std::vector<std::string> GetPrimaryKeyForTable(
+    PostgresqlClient *client, const std::string_view &table_schema,
+    const std::string_view &table_name) {
   const std::string statement =
       "SELECT usage.column_name FROM "
       "  information_schema.table_constraints AS constraints"
@@ -206,18 +217,19 @@ std::vector<std::string> GetPrimaryKeyForTable(PostgresqlClient *client,
       "    USING (constraint_schema, constraint_name)"
       "WHERE"
       "  constraint_type = 'PRIMARY KEY'"
-      "  AND constraint_schema = '" +
-      client->Escape(kDefaultScheme) + "'" +
-      "  AND constraints.table_name = '" + client->Escape(table) + "';";
+      "  AND constraints.table_schema = '" +
+      client->Escape(table_schema) + "' AND constraints.table_name = '" +
+      client->Escape(table_name) + "';";
   CHECK(client->Execute(statement))
-      << "Unable to get primary key of table '" << table << "'!";
+      << "Unable to get primary key of table '" << table_name << "' in schema '"
+      << table_schema << "'!";
   std::optional<std::vector<mg::Value>> result;
   std::vector<std::string> primary_key;
   while ((result = client->FetchOne()) != std::nullopt) {
     CHECK(result->size() == 1 && (*result)[0].type() == mg::Value::Type::String)
         << "Received unexpected result while trying to "
            "get primary key of table '"
-        << table << "'!";
+        << table_name << "' in schema '" << table_schema << "'!";
     primary_key.emplace_back((*result)[0].ValueString());
   }
   return primary_key;
@@ -228,8 +240,10 @@ std::vector<SchemaInfo::ForeignKey> ListAllForeignKeys(
   const std::string statement =
       "SELECT"
       "  constraints.constraint_name,"
+      "  child.table_schema,"
       "  child.table_name,"
       "  child.column_name,"
+      "  parent.table_schema,"
       "  parent.table_name,"
       "  parent.column_name "
       "FROM"
@@ -238,42 +252,44 @@ std::vector<SchemaInfo::ForeignKey> ListAllForeignKeys(
       "    USING (constraint_schema, constraint_name)"
       "  JOIN information_schema.key_column_usage AS parent"
       "    ON parent.ordinal_position = child.position_in_unique_constraint"
-      "   AND parent.table_schema = child.table_schema"
       "   AND parent.constraint_name = constraints.unique_constraint_name "
-      "WHERE constraints.constraint_schema = '" +
-      client->Escape(kDefaultScheme) +
-      "' "
-      "ORDER BY constraints.constraint_name, child.ordinal_position;";
+      "WHERE constraints.constraint_schema NOT IN " +
+      kSchemaBlacklist + "  AND child.table_schema NOT IN " + kSchemaBlacklist +
+      "  AND parent.table_schema NOT IN " + kSchemaBlacklist +
+      " ORDER BY constraints.constraint_name, child.ordinal_position;";
   CHECK(client->Execute(statement)) << "Unable to list foreign keys!";
   std::optional<std::vector<mg::Value>> result;
   std::vector<SchemaInfo::ForeignKey> foreign_keys;
   SchemaInfo::ForeignKey current_foreign_key;
+  std::string prev_foreign_key_name;
   while ((result = client->FetchOne()) != std::nullopt) {
-    CHECK(result->size() == 5)
+    CHECK(result->size() == 7)
         << "Received unexpected result while listing foreign keys!";
     for (const auto &value : *result) {
       CHECK(value.type() == mg::Value::Type::String)
           << "Received unexpected result while listing foreign keys!";
     }
     const auto &foreign_key_name = (*result)[0].ValueString();
-    auto child_table = GetTableIndex(tables, (*result)[1].ValueString());
+    auto child_table = GetTableIndex(tables, (*result)[1].ValueString(),
+                                     (*result)[2].ValueString());
     auto child_column =
-        GetColumnIndex(tables[child_table].columns, (*result)[2].ValueString());
-    auto parent_table = GetTableIndex(tables, (*result)[3].ValueString());
+        GetColumnIndex(tables[child_table].columns, (*result)[3].ValueString());
+    auto parent_table = GetTableIndex(tables, (*result)[4].ValueString(),
+                                      (*result)[5].ValueString());
     auto parent_column = GetColumnIndex(tables[parent_table].columns,
-                                        (*result)[4].ValueString());
-    if (foreign_key_name != current_foreign_key.name) {
+                                        (*result)[6].ValueString());
+    if (foreign_key_name != prev_foreign_key_name) {
       if (!current_foreign_key.child_columns.empty()) {
         foreign_keys.push_back(current_foreign_key);
         current_foreign_key.child_columns.clear();
         current_foreign_key.parent_columns.clear();
       }
-      current_foreign_key.name = foreign_key_name;
       current_foreign_key.child_table = child_table;
       current_foreign_key.parent_table = parent_table;
     }
     current_foreign_key.child_columns.emplace_back(child_column);
     current_foreign_key.parent_columns.emplace_back(parent_column);
+    prev_foreign_key_name = foreign_key_name;
   }
   if (!current_foreign_key.child_columns.empty()) {
     foreign_keys.push_back(current_foreign_key);
@@ -284,22 +300,24 @@ std::vector<SchemaInfo::ForeignKey> ListAllForeignKeys(
 std::vector<SchemaInfo::ExistenceConstraint> ListAllExistenceConstraints(
     PostgresqlClient *client, const std::vector<SchemaInfo::Table> &tables) {
   std::string statement =
-      "SELECT table_name, column_name FROM information_schema.columns "
-      "WHERE table_schema = '" +
-      client->Escape(kDefaultScheme) + "' AND is_nullable = 'NO';";
+      "SELECT table_schema, table_name, column_name "
+      "FROM information_schema.columns "
+      "WHERE is_nullable = 'NO' AND table_schema NOT IN " +
+      kSchemaBlacklist + ";";
   CHECK(client->Execute(statement)) << "Unable to list existence constraints!";
   std::optional<std::vector<mg::Value>> result;
   std::vector<SchemaInfo::ExistenceConstraint> existence_constraints;
   while ((result = client->FetchOne()) != std::nullopt) {
-    CHECK(result->size() == 2)
+    CHECK(result->size() == 3)
         << "Received unexpected result while listing existence constraints!";
     for (const auto &value : *result) {
       CHECK(value.type() == mg::Value::Type::String)
           << "Received unexpected result while listing existence constraints!";
     }
-    const auto table = GetTableIndex(tables, (*result)[0].ValueString());
+    const auto table = GetTableIndex(tables, (*result)[0].ValueString(),
+                                     (*result)[1].ValueString());
     const auto column =
-        GetColumnIndex(tables[table].columns, (*result)[1].ValueString());
+        GetColumnIndex(tables[table].columns, (*result)[2].ValueString());
     existence_constraints.emplace_back(table, column);
   }
   return existence_constraints;
@@ -310,6 +328,7 @@ std::vector<SchemaInfo::UniqueConstraint> ListAllUniqueConstraints(
   std::string statement =
       "SELECT"
       "  tc.constraint_name,"
+      "  tc.table_schema,"
       "  tc.table_name,"
       "  ccu.column_name "
       "FROM"
@@ -324,16 +343,17 @@ std::vector<SchemaInfo::UniqueConstraint> ListAllUniqueConstraints(
   SchemaInfo::UniqueConstraint current_constraint;
   std::string prev_constraint_name;
   while ((result = client->FetchOne()) != std::nullopt) {
-    CHECK(result->size() == 3)
+    CHECK(result->size() == 4)
         << "Received unexpected result while listing unique constraints!";
     for (const auto &value : *result) {
       CHECK(value.type() == mg::Value::Type::String)
           << "Received unexpected result while listing unique constraints!";
     }
     const auto &constraint_name = (*result)[0].ValueString();
-    auto table = GetTableIndex(tables, (*result)[1].ValueString());
+    auto table = GetTableIndex(tables, (*result)[1].ValueString(),
+                               (*result)[2].ValueString());
     auto column =
-        GetColumnIndex(tables[table].columns, (*result)[2].ValueString());
+        GetColumnIndex(tables[table].columns, (*result)[3].ValueString());
     if (prev_constraint_name != constraint_name) {
       if (!current_constraint.second.empty()) {
         constraints.push_back(current_constraint);
@@ -417,13 +437,14 @@ PostgresqlSource::PostgresqlSource(std::unique_ptr<PostgresqlClient> client)
 PostgresqlSource::~PostgresqlSource() {}
 
 SchemaInfo PostgresqlSource::GetSchemaInfo() {
-  std::vector<std::string> table_names = ListAllTables(client_.get());
+  std::vector<std::pair<std::string, std::string>> table_names =
+      ListAllTables(client_.get());
   std::vector<SchemaInfo::Table> tables;
   tables.reserve(table_names.size());
-  for (const auto &table_name : table_names) {
-    auto columns = ListColumnsForTable(client_.get(), table_name);
+  for (const auto &[table_schema, table_name] : table_names) {
+    auto columns = ListColumnsForTable(client_.get(), table_schema, table_name);
     const auto &primary_key_columns =
-        GetPrimaryKeyForTable(client_.get(), table_name);
+        GetPrimaryKeyForTable(client_.get(), table_schema, table_name);
     std::vector<size_t> primary_key;
     primary_key.reserve(primary_key_columns.size());
     for (const auto &column_name : primary_key_columns) {
@@ -434,8 +455,8 @@ SchemaInfo PostgresqlSource::GetSchemaInfo() {
       primary_key.push_back(it - columns.begin());
     }
     // List of foreign keys of the current table is currently left empty.
-    tables.push_back({table_name, std::move(columns), std::move(primary_key),
-                      std::vector<size_t>(), false});
+    tables.push_back({table_schema, table_name, std::move(columns),
+                      std::move(primary_key), std::vector<size_t>(), false});
   }
 
   auto foreign_keys = ListAllForeignKeys(client_.get(), tables);
@@ -461,7 +482,7 @@ void PostgresqlSource::ReadTable(
                        [this](auto &os, const auto &column) {
                          os << client_->EscapeName(column);
                        });
-  statement << " FROM " << client_->EscapeName(kDefaultScheme) << "."
+  statement << " FROM " << client_->EscapeName(table.schema) << "."
             << client_->EscapeName(table.name) << ";";
   CHECK(client_->Execute(statement.str()))
       << "Unable to read table '" << table.name << "'!";

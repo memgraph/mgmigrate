@@ -169,6 +169,16 @@ bool IsTableRelationship(const SchemaInfo::Table &table) {
   return table.foreign_keys.size() == 2 && !table.primary_key_referenced;
 }
 
+/// Helper function that returns table name in the format which will be used for
+/// label and edge type naming.
+std::string GetTableName(const SchemaInfo::Table &table) {
+  // Most used schema is 'public'. In that case, just return the table name.
+  if (table.schema == "public") {
+    return table.name;
+  }
+  return table.schema + "." + table.name;
+}
+
 void MigratePostgresqlDatabase(PostgresqlSource *source,
                                MemgraphClient *destination) {
   // Get SQL schema info.
@@ -181,17 +191,17 @@ void MigratePostgresqlDatabase(PostgresqlSource *source,
     if (IsTableRelationship(table)) {
       continue;
     }
-    source->ReadTable(
-        table, [&destination, &table](const std::vector<mg::Value> &row) {
-          // Row is converted to node by labeling a node by table name, and
-          // constructing properties as list of (column name, column value)
-          // pairs.
-          mg::Map properties(row.size());
-          for (size_t i = 0; i < row.size(); ++i) {
-            properties.InsertUnsafe(table.columns[i], row[i]);
-          }
-          CreateNode(destination, {table.name}, properties.AsConstMap());
-        });
+    source->ReadTable(table, [&destination,
+                              &table](const std::vector<mg::Value> &row) {
+      // Row is converted to node by labeling a node by table name, and
+      // constructing properties as list of (column name, column value)
+      // pairs.
+      mg::Map properties(row.size());
+      for (size_t i = 0; i < row.size(); ++i) {
+        properties.InsertUnsafe(table.columns[i], row[i]);
+      }
+      CreateNode(destination, {GetTableName(table)}, properties.AsConstMap());
+    });
     if (!table.primary_key.empty()) {
       // Create index for fast node matching. Memgraph doesn't support multiple
       // properties for a single index, so we'll create index over only one
@@ -221,9 +231,11 @@ void MigratePostgresqlDatabase(PostgresqlSource *source,
             std::move(ConstructForeignKeyMatcher(schema, foreign_key2, row)));
         if (IsForeignKeyMatcherWellDefined(id1.AsConstMap()) &&
             IsForeignKeyMatcherWellDefined(id2.AsConstMap())) {
-          const auto &label1 = schema.tables[foreign_key1.parent_table].name;
-          const auto &label2 = schema.tables[foreign_key2.parent_table].name;
-          const auto &edge_type = table.name;
+          const auto &label1 =
+              GetTableName(schema.tables[foreign_key1.parent_table]);
+          const auto &label2 =
+              GetTableName(schema.tables[foreign_key2.parent_table]);
+          const auto &edge_type = GetTableName(table);
           mg::Map properties(row.size());
           for (size_t i = 0; i < row.size(); ++i) {
             if (!utils::Contains(foreign_key1.child_columns, i) &&
@@ -238,41 +250,42 @@ void MigratePostgresqlDatabase(PostgresqlSource *source,
         }
       });
     } else {
-      source->ReadTable(table, [&destination, &schema,
-                                &table](const auto &row) {
-        const auto &label1 = table.name;
-        mg::Map id1(row.size());
-        if (!table.primary_key.empty()) {
-          for (const auto pos : table.primary_key) {
-            id1.InsertUnsafe(table.columns[pos], row[pos]);
-          }
-        } else {
-          // If there is no primary key, use all columns to match a node.
-          for (size_t i = 0; i < row.size(); ++i) {
-            id1.InsertUnsafe(table.columns[i], row[i]);
-          }
-        }
-        for (const auto &fk_pos : table.foreign_keys) {
-          const auto &foreign_key = schema.foreign_keys[fk_pos];
-          const auto id2(
-              std::move(ConstructForeignKeyMatcher(schema, foreign_key, row)));
-          if (IsForeignKeyMatcherWellDefined(id2.AsConstMap())) {
-            const auto &label2 = schema.tables[foreign_key.parent_table].name;
-            const std::string edge_type = label1 + "_to_" + label2;
-            // If there is no primary key, use `MERGE` instead of `CREATE` to
-            // prevent creating duplicate relationships.
-            const bool use_merge = table.primary_key.empty();
-            const auto rels_created = CreateRelationships(
-                destination, label1, id1.AsConstMap(), label2, id2.AsConstMap(),
-                edge_type, mg::Map(static_cast<size_t>(0)).AsConstMap(),
-                use_merge);
+      source->ReadTable(
+          table, [&destination, &schema, &table](const auto &row) {
+            const auto &label1 = GetTableName(table);
+            mg::Map id1(row.size());
             if (!table.primary_key.empty()) {
-              CHECK(rels_created == 1)
-                  << "Unexpected number of relationships created!";
+              for (const auto pos : table.primary_key) {
+                id1.InsertUnsafe(table.columns[pos], row[pos]);
+              }
+            } else {
+              // If there is no primary key, use all columns to match a node.
+              for (size_t i = 0; i < row.size(); ++i) {
+                id1.InsertUnsafe(table.columns[i], row[i]);
+              }
             }
-          }
-        }
-      });
+            for (const auto &fk_pos : table.foreign_keys) {
+              const auto &foreign_key = schema.foreign_keys[fk_pos];
+              const auto id2(std::move(
+                  ConstructForeignKeyMatcher(schema, foreign_key, row)));
+              if (IsForeignKeyMatcherWellDefined(id2.AsConstMap())) {
+                const auto &label2 =
+                    GetTableName(schema.tables[foreign_key.parent_table]);
+                const std::string edge_type = label1 + "_to_" + label2;
+                // If there is no primary key, use `MERGE` instead of `CREATE`
+                // to prevent creating duplicate relationships.
+                const bool use_merge = table.primary_key.empty();
+                const auto rels_created = CreateRelationships(
+                    destination, label1, id1.AsConstMap(), label2,
+                    id2.AsConstMap(), edge_type,
+                    mg::Map(static_cast<size_t>(0)).AsConstMap(), use_merge);
+                if (!table.primary_key.empty()) {
+                  CHECK(rels_created == 1)
+                      << "Unexpected number of relationships created!";
+                }
+              }
+            }
+          });
     }
   }
 
@@ -288,18 +301,25 @@ void MigratePostgresqlDatabase(PostgresqlSource *source,
 
   // Migrate constraints.
   for (const auto &constraint : schema.existence_constraints) {
-    const auto &table_name = schema.tables[constraint.first].name;
-    const auto &column_name =
-        schema.tables[constraint.first].columns[constraint.second];
-    CreateExistenceConstraint(destination, table_name, column_name);
+    const auto &table = schema.tables[constraint.first];
+    if (IsTableRelationship(table)) {
+      continue;
+    }
+    const auto &label = GetTableName(table);
+    const auto &property = table.columns[constraint.second];
+    CreateExistenceConstraint(destination, label, property);
   }
   for (const auto &constraint : schema.unique_constraints) {
-    const auto &table_name = schema.tables[constraint.first].name;
-    std::set<std::string> column_names;
-    for (const auto &column_pos : constraint.second) {
-      column_names.insert(schema.tables[constraint.first].columns[column_pos]);
+    const auto &table = schema.tables[constraint.first];
+    if (IsTableRelationship(table)) {
+      continue;
     }
-    CreateUniqueConstraint(destination, table_name, column_names);
+    const auto &label = GetTableName(table);
+    std::set<std::string> properties;
+    for (const auto &column_pos : constraint.second) {
+      properties.insert(table.columns[column_pos]);
+    }
+    CreateUniqueConstraint(destination, label, properties);
   }
 }
 
