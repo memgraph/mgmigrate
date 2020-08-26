@@ -124,6 +124,31 @@ add_dependencies(pqxx pqxx-proj)
 include_directories(${PQXX_INCLUDE_DIR})
 
 
+# Setup MySQL Connector/C++
+set(MYSQL_CONNECTOR_ROOT ${PROJECT_BINARY_DIR}/mysqlconnector)
+ExternalProject_Add(mysqlconnector-proj
+  PREFIX         ${MYSQL_CONNECTOR_ROOT}
+  INSTALL_DIR    ${MYSQL_CONNECTOR_ROOT}
+  GIT_REPOSITORY https://github.com/mysql/mysql-connector-cpp
+  GIT_TAG        8.0.21
+  CMAKE_ARGS     "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
+  "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+  "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+  "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+  "-DBUILD_STATIC=ON"
+  "-DBUILD_TEST=OFF")
+
+set(MYSQL_CON_INCLUDE_DIR ${MYSQL_CONNECTOR_ROOT}/include)
+set(MYSQL_CON_LIBRARY_PATH ${MYSQL_CONNECTOR_ROOT}/lib64/debug/${CMAKE_FIND_LIBRARY_PREFIXES}mysqlcppconn8-static.a)
+add_library(mysqlconnector STATIC IMPORTED)
+set_target_properties(mysqlconnector PROPERTIES
+  IMPORTED_LOCATION ${MYSQL_CON_LIBRARY_PATH}
+  INTERFACE_LINK_LIBRARIES "${OPENSSL_LIBRARIES};${THREADS_LIBRARIES};resolv")
+add_dependencies(mysqlconnector mysqlconnector-proj)
+
+include_directories(${MYSQL_CON_INCLUDE_DIR})
+
+
 # Setup gtest
 set(GTEST_ROOT ${PROJECT_BINARY_DIR}/gtest)
 ExternalProject_Add(gtest-proj
