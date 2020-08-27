@@ -8,15 +8,17 @@ include_directories(
 
 set(MG_MIGRATE_LIB_SOURCES
   memgraph_destination.cpp
-  memgraph_source.cpp
-  postgresql.cpp)
+  source/memgraph_source.cpp
+  source/postgresql.cpp
+  source/mysql.cpp
+  source/schema_info.cpp)
 
 add_compile_options(-Wall -Wextra -Wredundant-move)
 
 add_subdirectory(mgclient)
 
 add_library(mgmigrate-lib ${MG_MIGRATE_LIB_SOURCES})
-target_link_libraries(mgmigrate-lib glog mgmigrate-mgclient pqxx pq)
+target_link_libraries(mgmigrate-lib glog mgmigrate-mgclient pqxx pq mysqlconnector)
 
 add_executable(mg_migrate main.cpp)
 target_link_libraries(mg_migrate gflags glog mgmigrate-lib)

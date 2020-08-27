@@ -5,8 +5,9 @@
 
 #include "memgraph_client.hpp"
 #include "memgraph_destination.hpp"
-#include "memgraph_source.hpp"
-#include "postgresql.hpp"
+#include "source/memgraph_source.hpp"
+#include "source/postgresql.hpp"
+#include "source/mysql.hpp"
 #include "utils/algorithm.hpp"
 
 const char *kUsage =
@@ -172,6 +173,7 @@ bool IsTableRelationship(const SchemaInfo::Table &table) {
 /// Helper function that returns table name in the format which will be used for
 /// label and edge type naming.
 std::string GetTableName(const SchemaInfo::Table &table) {
+  return table.name;
   // Most used schema is 'public'. In that case, just return the table name.
   if (table.schema == "public") {
     return table.name;
@@ -179,11 +181,13 @@ std::string GetTableName(const SchemaInfo::Table &table) {
   return table.schema + "." + table.name;
 }
 
-void MigratePostgresqlDatabase(PostgresqlSource *source,
-                               MemgraphClient *destination) {
+template<typename Source>
+void MigrateSqlDatabase(Source* source,
+                        MemgraphClient *destination) {
   // Get SQL schema info.
   auto schema = source->GetSchemaInfo();
 
+  DLOG(INFO) << "Migrating rows";
   // Migrate rows of tables as nodes.
   for (const auto &table : schema.tables) {
     // If the table has exactly two foreign keys, it's better to represent it
@@ -215,6 +219,7 @@ void MigratePostgresqlDatabase(PostgresqlSource *source,
     }
   }
 
+  DLOG(INFO) << "Migrating edges";
   // Migrate edges using foreign keys.
   for (const auto &table : schema.tables) {
     if (table.foreign_keys.empty()) {
@@ -299,6 +304,7 @@ void MigratePostgresqlDatabase(PostgresqlSource *source,
     }
   }
 
+  DLOG(INFO) << "Migrating existence constraints";
   // Migrate constraints.
   for (const auto &constraint : schema.existence_constraints) {
     const auto &table = schema.tables[constraint.first];
@@ -309,6 +315,7 @@ void MigratePostgresqlDatabase(PostgresqlSource *source,
     const auto &property = table.columns[constraint.second];
     CreateExistenceConstraint(destination, label, property);
   }
+  DLOG(INFO) << "Migrating unique constraints";
   for (const auto &constraint : schema.unique_constraints) {
     const auto &table = schema.tables[constraint.first];
     if (IsTableRelationship(table)) {
@@ -324,12 +331,19 @@ void MigratePostgresqlDatabase(PostgresqlSource *source,
 }
 
 uint16_t GetSourcePort(int port, const std::string &kind) {
-  if (port == 0 && kind == "memgraph") {
-    return 7687;
+  if (port == 0 ) {
+    // Return default ports
+    if (kind == "memgraph") {
+      return 7687;
+    }
+    if (kind == "postgresql") {
+      return 5432;
+    }
+    if (kind == "mysql") {
+      return 3306;
+    }
   }
-  if (port == 0 && kind == "postgresql") {
-    return 5432;
-  }
+
   return port;
 }
 
@@ -387,7 +401,21 @@ int main(int argc, char **argv) {
     CHECK(source_db) << "Couldn't connect to the source database.";
 
     PostgresqlSource source(std::move(source_db));
-    MigratePostgresqlDatabase(&source, destination_db.get());
+    MigrateSqlDatabase(&source, destination_db.get());
+  } else if (FLAGS_source_kind == "mysql" ) {
+    CHECK(FLAGS_source_database != "")
+        << "Please specify a MySQL database name!";
+
+    auto source_db =
+        MysqlClient::Connect({.host = FLAGS_source_host,
+                              .port = source_port,
+                              .username = FLAGS_source_username,
+                              .password = FLAGS_source_password,
+                              .database = FLAGS_source_database});
+    CHECK(source_db) << "Couldn't connect to the source database.";
+
+    MysqlSource source(std::move(source_db));
+    MigrateSqlDatabase(&source, destination_db.get());
   } else {
     std::cerr << "Unknown source kind '" << FLAGS_source_kind
               << "'. Please run 'mg_migrate --help' to see options.";
