@@ -5,7 +5,7 @@
 
 #include "memgraph_client.hpp"
 #include "memgraph_destination.hpp"
-#include "source/memgraph_source.hpp"
+#include "source/memgraph.hpp"
 #include "source/postgresql.hpp"
 #include "source/mysql.hpp"
 #include "utils/algorithm.hpp"

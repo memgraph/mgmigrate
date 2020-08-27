@@ -8,7 +8,7 @@ include_directories(
 
 set(MG_MIGRATE_LIB_SOURCES
   memgraph_destination.cpp
-  source/memgraph_source.cpp
+  source/memgraph.cpp
   source/postgresql.cpp
   source/mysql.cpp
   source/schema_info.cpp)

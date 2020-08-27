@@ -1,4 +1,4 @@
-#include "memgraph_source.hpp"
+#include "memgraph.hpp"
 
 #include <glog/logging.h>
 
