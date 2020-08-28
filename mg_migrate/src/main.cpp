@@ -173,12 +173,11 @@ bool IsTableRelationship(const SchemaInfo::Table &table) {
 /// Helper function that returns table name in the format which will be used for
 /// label and edge type naming.
 std::string GetTableName(const SchemaInfo::Table &table) {
-  return table.name;
   // Most used schema is 'public'. In that case, just return the table name.
   if (table.schema == "public") {
     return table.name;
   }
-  return table.schema + "." + table.name;
+  return table.schema + "_" + table.name;
 }
 
 template<typename Source>
@@ -212,10 +211,10 @@ void MigrateSqlDatabase(Source* source,
       // primary index field.
       // TODO: If Memgraph supports this feature in the future, create index
       // over all primary key fields.
-      CreateLabelPropertyIndex(destination, table.name,
+      CreateLabelPropertyIndex(destination, GetTableName(table),
                                table.columns[table.primary_key[0]]);
     } else {
-      CreateLabelIndex(destination, table.name);
+      CreateLabelIndex(destination, GetTableName(table));
     }
   }
 
@@ -297,10 +296,10 @@ void MigrateSqlDatabase(Source* source,
   // Cleanup internally created indices.
   for (const auto &table : schema.tables) {
     if (!table.primary_key.empty()) {
-      DropLabelPropertyIndex(destination, table.name,
+      DropLabelPropertyIndex(destination, GetTableName(table),
                              table.columns[table.primary_key[0]]);
     } else {
-      DropLabelIndex(destination, table.name);
+      DropLabelIndex(destination, GetTableName(table));
     }
   }
 
