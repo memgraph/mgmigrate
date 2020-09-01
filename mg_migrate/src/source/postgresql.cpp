@@ -1,4 +1,4 @@
-#include "postgresql.hpp"
+#include "source/postgresql.hpp"
 
 #include <memory>
 #include <optional>
@@ -388,7 +388,7 @@ std::optional<std::vector<mg::Value>> PostgresqlClient::FetchOne() {
       return std::nullopt;
     }
   } catch (const pqxx::sql_error &e) {
-    CHECK(false) << "Unable to fetch PostgreSQL result: " << e.what();
+    LOG(FATAL) << "Unable to fetch PostgreSQL result: " << e.what();
   }
 }
 

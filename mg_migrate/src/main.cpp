@@ -6,8 +6,8 @@
 #include "memgraph_client.hpp"
 #include "memgraph_destination.hpp"
 #include "source/memgraph.hpp"
-#include "source/postgresql.hpp"
 #include "source/mysql.hpp"
+#include "source/postgresql.hpp"
 #include "utils/algorithm.hpp"
 
 const char *kUsage =
@@ -180,14 +180,13 @@ std::string GetTableName(const SchemaInfo::Table &table) {
   return table.schema + "_" + table.name;
 }
 
-template<typename Source>
-void MigrateSqlDatabase(Source* source,
-                        MemgraphClient *destination) {
+template <typename Source>
+void MigrateSqlDatabase(Source *source, MemgraphClient *destination) {
   // Get SQL schema info.
   auto schema = source->GetSchemaInfo();
 
-  DLOG(INFO) << "Migrating rows";
   // Migrate rows of tables as nodes.
+  DLOG(INFO) << "Migrating rows";
   for (const auto &table : schema.tables) {
     // If the table has exactly two foreign keys, it's better to represent it
     // as a relationship instead of a node.
@@ -218,8 +217,8 @@ void MigrateSqlDatabase(Source* source,
     }
   }
 
-  DLOG(INFO) << "Migrating edges";
   // Migrate edges using foreign keys.
+  DLOG(INFO) << "Migrating edges";
   for (const auto &table : schema.tables) {
     if (table.foreign_keys.empty()) {
       continue;
@@ -303,8 +302,8 @@ void MigrateSqlDatabase(Source* source,
     }
   }
 
-  DLOG(INFO) << "Migrating existence constraints";
   // Migrate constraints.
+  DLOG(INFO) << "Migrating existence constraints";
   for (const auto &constraint : schema.existence_constraints) {
     const auto &table = schema.tables[constraint.first];
     if (IsTableRelationship(table)) {
@@ -330,7 +329,7 @@ void MigrateSqlDatabase(Source* source,
 }
 
 uint16_t GetSourcePort(int port, const std::string &kind) {
-  if (port == 0 ) {
+  if (port == 0) {
     // Return default ports
     if (kind == "memgraph") {
       return 7687;
@@ -401,16 +400,15 @@ int main(int argc, char **argv) {
 
     PostgresqlSource source(std::move(source_db));
     MigrateSqlDatabase(&source, destination_db.get());
-  } else if (FLAGS_source_kind == "mysql" ) {
+  } else if (FLAGS_source_kind == "mysql") {
     CHECK(FLAGS_source_database != "")
         << "Please specify a MySQL database name!";
 
-    auto source_db =
-        MysqlClient::Connect({.host = FLAGS_source_host,
-                              .port = source_port,
-                              .username = FLAGS_source_username,
-                              .password = FLAGS_source_password,
-                              .database = FLAGS_source_database});
+    auto source_db = MysqlClient::Connect({.host = FLAGS_source_host,
+                                           .port = source_port,
+                                           .username = FLAGS_source_username,
+                                           .password = FLAGS_source_password,
+                                           .database = FLAGS_source_database});
     CHECK(source_db) << "Couldn't connect to the source database.";
 
     MysqlSource source(std::move(source_db));

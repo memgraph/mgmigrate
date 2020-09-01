@@ -36,9 +36,9 @@ struct SchemaInfo {
   std::vector<ExistenceConstraint> existence_constraints;
 };
 
-std::size_t GetTableIndex(const std::vector<SchemaInfo::Table> &tables,
-                          const std::string_view table_schema,
-                          const std::string_view table_name);
+size_t GetTableIndex(const std::vector<SchemaInfo::Table> &tables,
+                     const std::string_view table_schema,
+                     const std::string_view table_name);
 
-std::size_t GetColumnIndex(const std::vector<std::string> &columns,
-                           const std::string_view column_name);
+size_t GetColumnIndex(const std::vector<std::string> &columns,
+                      const std::string_view column_name);

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "source/schema_info.hpp"
-
 #include <memory>
 #include <optional>
 #include <string>
@@ -10,6 +8,7 @@
 #include <pqxx/pqxx>
 
 #include "mgclient/value.hpp"
+#include "source/schema_info.hpp"
 
 /// Name mapping for PostgreSQL object identifier types (OID). These values are
 /// internally used by PostgreSQL server and the same list can be obtained by

@@ -1,15 +1,15 @@
 #pragma once
 
-#include "mgclient/value.hpp"
-#include "schema_info.hpp"
-
 #include <mysqlx/xdevapi.h>
 
+#include "mgclient/value.hpp"
+#include "source/schema_info.hpp"
+
 class MysqlClient {
-public:
+ public:
   struct Params {
     std::string host;
-    std::uint16_t port;
+    uint16_t port;
     std::string username;
     std::string password;
     std::string database;
@@ -23,22 +23,19 @@ public:
 
   static std::unique_ptr<MysqlClient> Connect(const Params &params);
 
-  auto const &session() const {
-    return session_;
-  }
-private:
+  mysqlx::Session *session() const { return session_.get(); }
+
+ private:
   explicit MysqlClient(std::unique_ptr<mysqlx::Session> session)
-    : session_(std::move(session))
-  {}
+      : session_(std::move(session)) {}
 
   std::unique_ptr<mysqlx::Session> session_;
 };
 
 class MysqlSource {
-public:
+ public:
   explicit MysqlSource(std::unique_ptr<MysqlClient> client)
-    : client_(std::move(client))
-  {}
+      : client_(std::move(client)) {}
 
   MysqlSource(const MysqlSource &) = delete;
   MysqlSource(MysqlSource &&) = delete;
@@ -49,6 +46,7 @@ public:
 
   void ReadTable(const SchemaInfo::Table &table,
                  std::function<void(const std::vector<mg::Value> &)> callback);
-private:
+
+ private:
   std::unique_ptr<MysqlClient> client_;
 };
