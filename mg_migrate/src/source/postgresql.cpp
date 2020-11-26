@@ -1,4 +1,4 @@
-#include "postgresql.hpp"
+#include "source/postgresql.hpp"
 
 #include <memory>
 #include <optional>
@@ -158,27 +158,6 @@ std::vector<std::pair<std::string, std::string>> ListAllTables(
     tables.emplace_back(std::move(table_schema), std::move(table_name));
   }
   return tables;
-}
-
-size_t GetTableIndex(const std::vector<SchemaInfo::Table> &tables,
-                     const std::string_view &table_schema,
-                     const std::string_view &table_name) {
-  for (size_t i = 0; i < tables.size(); ++i) {
-    if (tables[i].schema == table_schema && tables[i].name == table_name) {
-      return i;
-    }
-  }
-  CHECK(false) << "Couldn't find table name '" << table_name << "' in schema '"
-               << table_schema << "'!";
-  return 0;
-}
-
-size_t GetColumnIndex(const std::vector<std::string> &columns,
-                      const std::string_view &column_name) {
-  auto it = std::find(columns.begin(), columns.end(), column_name);
-  CHECK(it != columns.end())
-      << "Couldn't find column name '" << column_name << "'!";
-  return it - columns.begin();
 }
 
 std::vector<std::string> ListColumnsForTable(
@@ -409,7 +388,7 @@ std::optional<std::vector<mg::Value>> PostgresqlClient::FetchOne() {
       return std::nullopt;
     }
   } catch (const pqxx::sql_error &e) {
-    CHECK(false) << "Unable to fetch PostgreSQL result: " << e.what();
+    LOG(FATAL) << "Unable to fetch PostgreSQL result: " << e.what();
   }
 }
 

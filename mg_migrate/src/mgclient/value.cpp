@@ -36,7 +36,7 @@ Value::Type ConvertType(mg_value_type type) {
     case MG_VALUE_TYPE_PATH:
       return Value::Type::Path;
     case MG_VALUE_TYPE_UNKNOWN:
-      CHECK(false) << "Unknown value type!";
+      LOG(FATAL) << "Unknown value type!";
       return Value::Type::Null;
   }
 }
@@ -203,7 +203,7 @@ bool AreValuesEqual(const mg_value *value1, const mg_value *value2) {
     case MG_VALUE_TYPE_PATH:
       return ArePathsEqual(mg_value_path(value1), mg_value_path(value2));
     case MG_VALUE_TYPE_UNKNOWN:
-      CHECK(false) << "Unknown value type!";
+      LOG(FATAL) << "Unknown value type!";
       return false;
   }
 }

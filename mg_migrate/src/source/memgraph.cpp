@@ -1,4 +1,4 @@
-#include "memgraph_source.hpp"
+#include "source/memgraph.hpp"
 
 #include <glog/logging.h>
 
@@ -47,7 +47,7 @@ MemgraphSource::IndexInfo MemgraphSource::ReadIndices() {
       const auto &property = (*row)[2].ValueString();
       info.label_property.emplace_back(label, property);
     } else {
-      CHECK(false) << "Received unsupported index type '" << type << "'!";
+      LOG(FATAL) << "Received unsupported index type '" << type << "'!";
     }
   }
   return info;
@@ -80,7 +80,7 @@ MemgraphSource::ConstraintInfo MemgraphSource::ReadConstraints() {
       }
       info.unique.emplace_back(label, std::move(properties));
     } else {
-      CHECK(false) << "Received unsupported constraint type '" << type << "'!";
+      LOG(FATAL) << "Received unsupported constraint type '" << type << "'!";
     }
   }
   return info;
