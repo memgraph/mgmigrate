@@ -1,8 +1,8 @@
 #pragma once
 
 #include <mysqlx/xdevapi.h>
+#include <mgclient-value.hpp>
 
-#include "mgclient/value.hpp"
 #include "source/schema_info.hpp"
 
 class MysqlClient {

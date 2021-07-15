@@ -3,7 +3,7 @@
 #include <malloc.h>
 #include <mgclient.h>
 
-#include "mgclient/value.hpp"
+#include <mgclient-value.hpp>
 
 #include <unistd.h>
 

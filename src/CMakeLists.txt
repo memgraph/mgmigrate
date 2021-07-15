@@ -15,10 +15,8 @@ set(MG_MIGRATE_LIB_SOURCES
 
 add_compile_options(-Wall -Wextra -Wredundant-move)
 
-add_subdirectory(mgclient)
-
 add_library(mgmigrate-lib ${MG_MIGRATE_LIB_SOURCES})
-target_link_libraries(mgmigrate-lib glog mgmigrate-mgclient pqxx pq mysqlconnector)
+target_link_libraries(mgmigrate-lib mgclient glog pqxx pq mysqlconnector)
 
 add_executable(mg_migrate main.cpp)
 target_link_libraries(mg_migrate gflags glog mgmigrate-lib)
