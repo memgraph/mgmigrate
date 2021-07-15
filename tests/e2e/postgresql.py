@@ -13,7 +13,7 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 PROJECT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", ".."))
 BUILD_DIR = os.path.join(PROJECT_DIR, "build")
 
-POSTGRES_HOST = 'localhost'
+POSTGRES_HOST = '127.0.0.1'
 POSTGRES_USERNAME = 'postgres'
 POSTGRES_PASSWORD = 'postgres'
 POSTGRES_PORT = 5432
@@ -37,7 +37,7 @@ def CleanMemgraph():
 
 def SetupPostgres():
     conn = psycopg2.connect(
-        host='localhost', user='postgres', password='postgres')
+        host=POSTGRES_HOST, user=POSTGRES_USERNAME, password=POSTGRES_PASSWORD)
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     cursor = conn.cursor()
     cursor.execute("CREATE DATABASE imdb")
