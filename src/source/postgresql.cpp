@@ -9,7 +9,6 @@
 
 #include <glog/logging.h>
 
-#include "mgclient/value.hpp"
 #include "utils/algorithm.hpp"
 
 namespace {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mgclient/client.hpp"
+#include <mgclient.hpp>
 
 /// Interface for Memgraph client.
 class MemgraphClient {

@@ -9,8 +9,8 @@
 #include <mysqlx/devapi/document.h>
 #include <mysqlx/devapi/result.h>
 #include <mysqlx/xdevapi.h>
+#include <mgclient-value.hpp>
 
-#include "mgclient/value.hpp"
 #include "source/schema_info.hpp"
 
 namespace {

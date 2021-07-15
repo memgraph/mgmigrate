@@ -84,6 +84,7 @@ set(MG_CLIENT_ROOT ${PROJECT_BINARY_DIR}/mgclient)
 ExternalProject_Add(mgclient-proj
   PREFIX            ${MG_CLIENT_ROOT}
   INSTALL_DIR       ${MG_CLIENT_ROOT}
+  GIT_TAG           v1.2.1
   GIT_REPOSITORY    https://github.com/memgraph/mgclient.git
   CMAKE_ARGS        "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
                     "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
@@ -130,7 +131,7 @@ ExternalProject_Add(mysqlconnector-proj
   PREFIX         ${MYSQL_CONN_ROOT}
   INSTALL_DIR    ${MYSQL_CONN_ROOT}
   GIT_REPOSITORY https://github.com/mysql/mysql-connector-cpp
-  GIT_TAG        8.0.21
+  GIT_TAG        8.0.25
   CMAKE_ARGS     "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
   "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
   "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"

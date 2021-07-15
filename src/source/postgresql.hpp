@@ -6,8 +6,8 @@
 #include <vector>
 
 #include <pqxx/pqxx>
+#include <mgclient-value.hpp>
 
-#include "mgclient/value.hpp"
 #include "source/schema_info.hpp"
 
 /// Name mapping for PostgreSQL object identifier types (OID). These values are
