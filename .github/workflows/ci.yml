@@ -1,0 +1,32 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build_and_test_linux:
+    strategy:
+     matrix:
+        platform: [ubuntu-20.04]
+    runs-on: ${{ matrix.platform }}
+    env:
+      MG_VERSION: "1.6.0"
+      POSTGRES_VERSION: "13.3"
+    steps:
+      - name: Set-up repository
+        uses: actions/checkout@v2
+      - name: Install environment
+        run: |
+          sudo apt install -y gcc-8 g++-8
+      - name: Pull and run Memgraph Docker image
+        run: |
+          docker pull memgraph/memgraph:${{ env.MG_VERSION }}-community
+          docker run -d -p 7687:7687 memgraph/memgraph:${{ env.MG_VERSION }}-community --telemetry-enabled=false
+      - name: Pull and run PostgreSQL Docker image
+        run: |
+          docker pull postgres:${{ env.POSTGRES_VERSION }}
+          docker run --name postgres-test -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:${{ env.POSTGRES_VERSION }}
+      - name: Build mgmigrate 
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_C_COMPILER=gcc-8 -DCMAKE_CXX_COMPILER=g++-8 -DCMAKE_BUILD_TYPE=Release ..
+          make -j8
