@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+
+import psycopg2
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+
+import mgclient
+
+import subprocess
+import os
+import atexit
+
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+PROJECT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", ".."))
+BUILD_DIR = os.path.join(PROJECT_DIR, "build")
+
+
+def CleanMemgraph():
+    conn = mgclient.connect(host='127.0.0.1', port=7687)
+    conn.autocommit = True
+    cursor = conn.cursor()
+    cursor.execute("MATCH (n) DETACH DELETE n;")
+    cursor.fetchall()
+
+    cursor.execute("MATCH (n) RETURN COUNT(n);")
+    row = cursor.fetchone()
+    assert len(row) == 1 and row[0] == 0, "Failed to clear Memgraph"
+    assert not cursor.fetchone()
+
+
+def SetupPostgres():
+    con = psycopg2.connect(
+        host='localhost', user='postgres', password='postgres')
+    con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+    cursor = con.cursor()
+    cursor.execute("CREATE DATABASE imdb")
+
+    with open('dataset/imdb_postgresql_dump.sql', 'r') as dump:
+        subprocess.run(['docker',
+                        'exec',
+                        '-i',
+                        'postgres-test',
+                        'psql',
+                        '-U',
+                        'postgres',
+                        '-h',
+                        'localhost',
+                        '-d',
+                        'imdb'],
+                       check=True,
+                       stdin=dump)
+
+
+def TeardownPostgres():
+    con = psycopg2.connect(
+        host='localhost', user='postgres', password='postgres')
+    con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+    cursor = con.cursor()
+    cursor.execute("DROP DATABASE imdb")
+
+
+def Validate():
+    conn = mgclient.connect(host='127.0.0.1', port=7687)
+    conn.autocommit = True
+    cursor = conn.cursor()
+
+    cursor.execute(
+        'MATCH (a:actors {name: "Christian Bale"})-[:movie_roles]->(m:movies) '
+        'WHERE m.rating >= 8 '
+        'RETURN m.title, m.rating '
+        'ORDER BY m.rating DESC')
+    rows = cursor.fetchall()
+    expected_rows = [
+        ('The Dark Knight',
+         9.0),
+        ('The Prestige',
+         8.5),
+        ('The Dark Knight Rises',
+         8.4),
+        ('Batman Begins',
+         8.2),
+        ('Ford v Ferrari',
+         8.1)]
+    assert rows == expected_rows, "Invalid results returned"
+
+    cursor.execute(
+        'MATCH path = (:actors {name: "George Clooney"})-[* bfs]-(:actors {name: "Kevin Bacon"}) '
+        'RETURN size(path) / 2')
+    row = cursor.fetchone()
+    assert len(row) == 1 and row[0] == 2, "Got invalid path from Memgraph"
+    assert not cursor.fetchone()
+
+    cursor.execute(
+        'SHOW CONSTRAINT INFO')
+    rows = cursor.fetchall()
+    expected_rows = [
+        ('exists',
+         'actors',
+         'actor_id'),
+        ('exists',
+         'actors',
+         'name'),
+        ('exists',
+         'movies',
+         'movie_id'),
+        ('exists',
+         'movies',
+         'title'),
+        ('exists',
+         'tvseries',
+         'series_id'),
+        ('exists',
+         'tvseries',
+         'title'),
+        ('exists',
+         'tvepisodes',
+         'series_id'),
+        ('exists',
+         'tvepisodes',
+         'episode_id'),
+        ('unique',
+         'actors',
+         ['actor_id']),
+        ('unique',
+         'movies',
+         ['movie_id']),
+        ('unique',
+         'tvseries',
+         ['series_id']),
+        ('unique',
+         'tvepisodes',
+         ['episode_id'])]
+    assert rows == expected_rows, "Invalid constraints returned"
+
+
+if __name__ == '__main__':
+    CleanMemgraph()
+    atexit.register(CleanMemgraph)
+
+    SetupPostgres()
+    atexit.register(TeardownPostgres)
+
+    subprocess.run([BUILD_DIR + '/src/mg_migrate',
+                    '--source-kind=postgresql',
+                    '--source-host=localhost',
+                    '--source-port=5432',
+                    '--source-username=postgres',
+                    '--source-password=postgres',
+                    '--source-database=imdb',
+                    '--destination-host=localhost',
+                    '--destination-port=7687',
+                    '--destination-use-ssl=false',
+                    ], check=True, stderr=subprocess.STDOUT)
+    Validate()
