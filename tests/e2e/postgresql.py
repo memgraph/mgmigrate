@@ -13,9 +13,17 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 PROJECT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", ".."))
 BUILD_DIR = os.path.join(PROJECT_DIR, "build")
 
+POSTGRES_HOST = 'localhost'
+POSTGRES_USERNAME = 'postgres'
+POSTGRES_PASSWORD = 'postgres'
+POSTGRES_PORT = 5432
+
+MEMGRAPH_HOST = '127.0.0.1'
+MEMGRAPH_PORT = 7687
+
 
 def CleanMemgraph():
-    conn = mgclient.connect(host='127.0.0.1', port=7687)
+    conn = mgclient.connect(host=MEMGRAPH_HOST, port=MEMGRAPH_PORT)
     conn.autocommit = True
     cursor = conn.cursor()
     cursor.execute("MATCH (n) DETACH DELETE n;")
@@ -28,10 +36,10 @@ def CleanMemgraph():
 
 
 def SetupPostgres():
-    con = psycopg2.connect(
+    conn = psycopg2.connect(
         host='localhost', user='postgres', password='postgres')
-    con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-    cursor = con.cursor()
+    conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+    cursor = conn.cursor()
     cursor.execute("CREATE DATABASE imdb")
 
     with open('dataset/imdb_postgresql_dump.sql', 'r') as dump:
@@ -41,9 +49,9 @@ def SetupPostgres():
                         'postgres-test',
                         'psql',
                         '-U',
-                        'postgres',
+                        POSTGRES_USERNAME,
                         '-h',
-                        'localhost',
+                        POSTGRES_HOST,
                         '-d',
                         'imdb'],
                        check=True,
@@ -52,14 +60,14 @@ def SetupPostgres():
 
 def TeardownPostgres():
     con = psycopg2.connect(
-        host='localhost', user='postgres', password='postgres')
+        host=POSTGRES_HOST, user=POSTGRES_USERNAME, password=POSTGRES_PASSWORD)
     con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     cursor = con.cursor()
     cursor.execute("DROP DATABASE imdb")
 
 
 def Validate():
-    conn = mgclient.connect(host='127.0.0.1', port=7687)
+    conn = mgclient.connect(host=MEMGRAPH_HOST, port=MEMGRAPH_PORT)
     conn.autocommit = True
     cursor = conn.cursor()
 
@@ -141,13 +149,19 @@ if __name__ == '__main__':
 
     subprocess.run([BUILD_DIR + '/src/mg_migrate',
                     '--source-kind=postgresql',
-                    '--source-host=localhost',
-                    '--source-port=5432',
-                    '--source-username=postgres',
-                    '--source-password=postgres',
+                    '--source-host',
+                    POSTGRES_HOST,
+                    '--source-port',
+                    str(POSTGRES_PORT),
+                    '--source-username',
+                    POSTGRES_USERNAME,
+                    '--source-password',
+                    POSTGRES_PASSWORD,
                     '--source-database=imdb',
-                    '--destination-host=localhost',
-                    '--destination-port=7687',
+                    '--destination-host',
+                    MEMGRAPH_HOST,
+                    '--destination-port',
+                    str(MEMGRAPH_PORT),
                     '--destination-use-ssl=false',
                     ], check=True, stderr=subprocess.STDOUT)
     Validate()
