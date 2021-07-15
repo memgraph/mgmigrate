@@ -46,7 +46,7 @@ def SetupPostgres():
         subprocess.run(['docker',
                         'exec',
                         '-i',
-                        'postgres-test',
+                        'postgres',
                         'psql',
                         '-U',
                         POSTGRES_USERNAME,
@@ -141,12 +141,15 @@ def Validate():
 
 
 if __name__ == '__main__':
+    print("Preparing Memgraph")
     CleanMemgraph()
     atexit.register(CleanMemgraph)
 
+    print("Preparing Postgres")
     SetupPostgres()
     atexit.register(TeardownPostgres)
 
+    print("Migrating data from Postgres to Memgraph")
     subprocess.run([BUILD_DIR + '/src/mg_migrate',
                     '--source-kind=postgresql',
                     '--source-host',
@@ -164,4 +167,8 @@ if __name__ == '__main__':
                     str(MEMGRAPH_PORT),
                     '--destination-use-ssl=false',
                     ], check=True, stderr=subprocess.STDOUT)
+    print("Migration done")
+
+    print("Validating Memgraph data")
     Validate()
+    print("Validation passed")

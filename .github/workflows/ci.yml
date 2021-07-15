@@ -3,14 +3,28 @@ name: CI
 on: [push]
 
 jobs:
-  build_and_test_linux:
+  build_and_test_postgresql:
     strategy:
      matrix:
         platform: [ubuntu-20.04]
     runs-on: ${{ matrix.platform }}
-    env:
-      MG_VERSION: "1.6.0"
-      POSTGRES_VERSION: "13.3"
+
+    services:
+      postgres:
+        image: postgres:13.3
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --name postgres
+      memgraph:
+        image: memgraph/memgraph:1.6.0-community
+        ports:
+          - 7687:7687
+        options: >-
+          --name memgraph
+
     steps:
       - name: Set-up repository
         uses: actions/checkout@v2
@@ -18,9 +32,6 @@ jobs:
         run: |
           sudo apt install -y gcc g++ python3
           pip3 install pymgclient psycopg2
-      - name: Pull Memgraph Docker image
-        run: |
-          docker pull memgraph/memgraph:${{ env.MG_VERSION }}-community
       - name: Build mgmigrate 
         run: |
           mkdir build && cd build
@@ -28,14 +39,5 @@ jobs:
           make -j8
       - name: Test PostgreSQL
         run: |
-          docker run -d -p 7687:7687 memgraph/memgraph:${{ env.MG_VERSION }}-community --telemetry-enabled=false
-
-          # Pull and run postgres docker image
-          docker pull postgres:${{ env.POSTGRES_VERSION }}
-          docker run --name postgres-test -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:${{ env.POSTGRES_VERSION }}
-
           cd tests/e2e
           ./postgresql.py
-
-          docker stop $(docker ps -a -q)
-          
