@@ -22,19 +22,6 @@ MEMGRAPH_HOST = '127.0.0.1'
 MEMGRAPH_PORT = 7687
 
 
-def CleanMemgraph():
-    conn = mgclient.connect(host=MEMGRAPH_HOST, port=MEMGRAPH_PORT)
-    conn.autocommit = True
-    cursor = conn.cursor()
-    cursor.execute("MATCH (n) DETACH DELETE n;")
-    cursor.fetchall()
-
-    cursor.execute("MATCH (n) RETURN COUNT(n);")
-    row = cursor.fetchone()
-    assert len(row) == 1 and row[0] == 0, "Failed to clear Memgraph"
-    assert not cursor.fetchone()
-
-
 def SetupPostgres():
     conn = psycopg2.connect(
         host=POSTGRES_HOST, user=POSTGRES_USERNAME, password=POSTGRES_PASSWORD)
@@ -64,6 +51,36 @@ def TeardownPostgres():
     con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     cursor = con.cursor()
     cursor.execute("DROP DATABASE imdb")
+
+def CleanMemgraph():
+    conn = mgclient.connect(host=MEMGRAPH_HOST, port=MEMGRAPH_PORT)
+    conn.autocommit = True
+    cursor = conn.cursor()
+    cursor.execute("MATCH (n) DETACH DELETE n;")
+    cursor.fetchall()
+
+    cursor.execute("MATCH (n) RETURN COUNT(n);")
+    row = cursor.fetchone()
+    assert len(row) == 1 and row[0] == 0, "Failed to clear Memgraph"
+    assert not cursor.fetchone()
+
+    # remove all the constraints
+    cursor.execute("SHOW CONSTRAINT INFO")
+    rows = cursor.fetchall()
+
+    for constraint_type, label, properties in rows:
+        if constraint_type == 'exists':
+            cursor.execute(f'DROP CONSTRAINT ON (n:{label}) ASSERT exists (n.{properties})')
+            cursor.fetchall()
+        else:
+            assert constraint_type == 'unique', "Invalid constraint type"
+            property_list = ', '.join([f'n.{p}' for p in properties])
+            cursor.execute(f'DROP CONSTRAINT ON (n:{label}) ASSERT {property_list} IS UNIQUE')
+            cursor.fetchall()
+
+    cursor.execute("SHOW CONSTRAINT INFO")
+    rows = cursor.fetchall()
+    assert len(rows) == 0, "Failed to clean constraints"
 
 
 def Validate():
