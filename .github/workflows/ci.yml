@@ -24,6 +24,8 @@ jobs:
           - 7687:7687
         options: >-
           --name memgraph
+          -i
+          --entrypoint /bin/bash
 
     steps:
       - name: Set-up repository
@@ -32,6 +34,9 @@ jobs:
         run: |
           sudo apt install -y gcc g++ python3
           pip3 install pymgclient psycopg2
+      - name: Start Memgraph
+        run: |
+          docker exec -i -d memgraph /usr/lib/memgraph/memgraph --telemetry-enabled=false
       - name: Build mgmigrate 
         run: |
           mkdir build && cd build
