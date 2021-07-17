@@ -1,7 +1,7 @@
-#include <iostream>
-
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+
+#include <iostream>
 
 #include "memgraph_client.hpp"
 #include "memgraph_destination.hpp"
@@ -338,7 +338,7 @@ uint16_t GetSourcePort(int port, const std::string &kind) {
       return 5432;
     }
     if (kind == "mysql") {
-      return 3306;
+      return 33060;
     }
   }
 

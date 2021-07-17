@@ -26,6 +26,15 @@ jobs:
           --name memgraph
           -i
           --entrypoint /bin/bash
+      mysql:
+        image: mysql/mysql-server:8.0
+        ports:
+          - 3306:3306
+          - 33060:33060
+        env:
+          MYSQL_ROOT_PASSWORD: mysql
+        options: >-
+          --name mysql
 
     steps:
       - name: Set-up repository
@@ -33,7 +42,7 @@ jobs:
       - name: Install environment
         run: |
           sudo apt install -y gcc g++ python3
-          pip3 install pymgclient psycopg2
+          pip3 install pymgclient psycopg2 mysql-connector-python
       - name: Start Memgraph
         run: |
           docker exec -i -d memgraph /usr/lib/memgraph/memgraph --telemetry-enabled=false
@@ -45,4 +54,11 @@ jobs:
       - name: Test PostgreSQL
         run: |
           cd tests/e2e
-          ./postgresql.py
+          ./postgresql_e2e.py
+      - name: Test MySQL
+        run: |
+          cd tests/e2e
+          docker exec -i mysql mysql --user=root --password=mysql -e "CREATE USER 'root'@'%' IDENTIFIED BY 'mysql'"
+          docker exec -i mysql mysql --user=root --password=mysql -e "GRANT ALL ON *.* to root@'%'"
+
+          ./mysql_e2e.py
