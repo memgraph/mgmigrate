@@ -50,11 +50,15 @@ def TeardownPostgres():
     cursor.execute("DROP DATABASE imdb")
 
 
-
 if __name__ == '__main__':
     print("Preparing Memgraph")
-    memgraph.CleanMemgraph()
-    atexit.register(memgraph.CleanMemgraph)
+    memgraph.CleanMemgraph(
+        memgraph.MEMGRAPH_DESTINATION_HOST,
+        memgraph.MEMGRAPH_DESTINATION_PORT)
+    atexit.register(
+        lambda: memgraph.CleanMemgraph(
+            memgraph.MEMGRAPH_DESTINATION_HOST,
+            memgraph.MEMGRAPH_DESTINATION_PORT))
 
     print("Preparing Postgres")
     SetupPostgres()
@@ -73,9 +77,9 @@ if __name__ == '__main__':
                     POSTGRES_PASSWORD,
                     '--source-database=imdb',
                     '--destination-host',
-                    memgraph.MEMGRAPH_HOST,
+                    memgraph.MEMGRAPH_DESTINATION_HOST,
                     '--destination-port',
-                    str(memgraph.MEMGRAPH_PORT),
+                    str(memgraph.MEMGRAPH_DESTINATION_PORT),
                     '--destination-use-ssl=false',
                     ], check=True, stderr=subprocess.STDOUT)
     print("Migration done")

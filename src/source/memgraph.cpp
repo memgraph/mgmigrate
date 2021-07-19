@@ -63,7 +63,7 @@ MemgraphSource::ConstraintInfo MemgraphSource::ReadConstraints() {
         << "Received unexpected result while reading constraints!";
     const auto &type = (*row)[0].ValueString();
     const auto &label = (*row)[1].ValueString();
-    if (type == "existence") {
+    if (type == "exists") {
       CHECK((*row)[2].type() == mg::Value::Type::String)
           << "Received unexpected result while reading constraints!";
       const auto &property = (*row)[2].ValueString();

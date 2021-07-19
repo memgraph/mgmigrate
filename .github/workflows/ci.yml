@@ -18,12 +18,20 @@ jobs:
           - 5432:5432
         options: >-
           --name postgres
-      memgraph:
+      memgraph-destination:
         image: memgraph/memgraph:1.6.0-community
         ports:
           - 7687:7687
         options: >-
-          --name memgraph
+          --name memgraph-destination
+          -i
+          --entrypoint /bin/bash
+      memgraph-source:
+        image: memgraph/memgraph:1.6.0-community
+        ports:
+          - 7688:7687
+        options: >-
+          --name memgraph-source
           -i
           --entrypoint /bin/bash
       mysql:
@@ -43,9 +51,10 @@ jobs:
         run: |
           sudo apt install -y gcc g++ python3
           pip3 install pymgclient psycopg2 mysql-connector-python
-      - name: Start Memgraph
+      - name: Start Memgraph Source and Destination
         run: |
-          docker exec -i -d memgraph /usr/lib/memgraph/memgraph --telemetry-enabled=false
+          docker exec -i -d memgraph-source /usr/lib/memgraph/memgraph --telemetry-enabled=false
+          docker exec -i -d memgraph-destination /usr/lib/memgraph/memgraph --telemetry-enabled=false
       - name: Build mgmigrate 
         run: |
           mkdir build && cd build
@@ -62,3 +71,7 @@ jobs:
           docker exec -i mysql mysql --user=root --password=mysql -e "GRANT ALL ON *.* to root@'%'"
 
           ./mysql_e2e.py
+      - name: Test Memgraph
+        run: |
+          cd tests/e2e
+          ./memgraph_e2e.py

@@ -1,11 +1,11 @@
 import mgclient
 
-MEMGRAPH_HOST = '127.0.0.1'
-MEMGRAPH_PORT = 7687
+MEMGRAPH_DESTINATION_HOST = '127.0.0.1'
+MEMGRAPH_DESTINATION_PORT = 7687
 
 
-def CleanMemgraph():
-    conn = mgclient.connect(host=MEMGRAPH_HOST, port=MEMGRAPH_PORT)
+def CleanMemgraph(host, port):
+    conn = mgclient.connect(host=host, port=port)
     conn.autocommit = True
     cursor = conn.cursor()
     cursor.execute("MATCH (n) DETACH DELETE n;")
@@ -39,7 +39,9 @@ def CleanMemgraph():
 
 def ValidateImdb(labels_with_prefix):
     label_prefix = 'imdb_' if labels_with_prefix else ''
-    conn = mgclient.connect(host=MEMGRAPH_HOST, port=MEMGRAPH_PORT)
+    conn = mgclient.connect(
+        host=MEMGRAPH_DESTINATION_HOST,
+        port=MEMGRAPH_DESTINATION_PORT)
     conn.autocommit = True
     cursor = conn.cursor()
 

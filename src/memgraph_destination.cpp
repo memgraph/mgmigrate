@@ -1,9 +1,9 @@
 #include "memgraph_destination.hpp"
 
+#include <glog/logging.h>
+
 #include <map>
 #include <sstream>
-
-#include <glog/logging.h>
 
 #include "utils/algorithm.hpp"
 
@@ -208,14 +208,14 @@ void RemoveLabelFromNodes(MemgraphClient *client,
                           const std::string_view &label) {
   const std::string query = "MATCH (u) REMOVE u:" + EscapeName(label) + ";";
   CHECK(client->Execute(query)) << "Couldn't remove a label from nodes!";
-  CHECK(!client->Execute(query))
-      << "Unexpected data received while removing a label from nodes!";
+  CHECK(!client->FetchOne())
+      << "Unexpected data received while dropping a label-property index!";
 }
 
 void RemovePropertyFromNodes(MemgraphClient *client,
                              const std::string_view &property) {
   const std::string query = "MATCH (u) REMOVE u." + EscapeName(property) + ";";
   CHECK(client->Execute(query)) << "Couldn't remove a property from nodes!";
-  CHECK(!client->Execute(query))
-      << "Unexpected data received while removing a property from nodes!";
+  CHECK(!client->FetchOne())
+      << "Unexpected data received while dropping a label-property index!";
 }

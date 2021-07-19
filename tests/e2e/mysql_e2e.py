@@ -21,7 +21,11 @@ MYSQL_PORT = 3306
 
 def SetupMysql():
     conn = mysql.connect(
-        host=MYSQL_HOST, user=MYSQL_USERNAME, password=MYSQL_PASSWORD, port=MYSQL_PORT, auth_plugin='mysql_native_password')
+        host=MYSQL_HOST,
+        user=MYSQL_USERNAME,
+        password=MYSQL_PASSWORD,
+        port=MYSQL_PORT,
+        auth_plugin='mysql_native_password')
     cursor = conn.cursor()
     cursor.execute("CREATE DATABASE imdb")
 
@@ -40,22 +44,29 @@ def SetupMysql():
 
 def TeardownMysql():
     conn = mysql.connect(
-        host=MYSQL_HOST, user=MYSQL_USERNAME, password=MYSQL_PASSWORD, auth_plugin='mysql_native_password')
+        host=MYSQL_HOST,
+        user=MYSQL_USERNAME,
+        password=MYSQL_PASSWORD,
+        auth_plugin='mysql_native_password')
     cursor = conn.cursor()
     cursor.execute("DROP DATABASE imdb")
 
 
-
 if __name__ == '__main__':
     print("Preparing Memgraph")
-    memgraph.CleanMemgraph()
-    atexit.register(memgraph.CleanMemgraph)
+    memgraph.CleanMemgraph(
+        memgraph.MEMGRAPH_DESTINATION_HOST,
+        memgraph.MEMGRAPH_DESTINATION_PORT)
+    atexit.register(
+        lambda: memgraph.CleanMemgraph(
+            memgraph.MEMGRAPH_DESTINATION_HOST,
+            memgraph.MEMGRAPH_DESTINATION_PORT))
 
     print("Preparing MySQL")
     SetupMysql()
     atexit.register(TeardownMysql)
 
-    print("Migrating data from Postgres to Memgraph")
+    print("Migrating data from MySQL to Memgraph")
     subprocess.run([BUILD_DIR + '/src/mg_migrate',
                     '--source-kind=mysql',
                     '--source-host',
@@ -68,9 +79,9 @@ if __name__ == '__main__':
                     MYSQL_PASSWORD,
                     '--source-database=imdb',
                     '--destination-host',
-                    memgraph.MEMGRAPH_HOST,
+                    memgraph.MEMGRAPH_DESTINATION_HOST,
                     '--destination-port',
-                    str(memgraph.MEMGRAPH_PORT),
+                    str(memgraph.MEMGRAPH_DESTINATION_PORT),
                     '--destination-use-ssl=false',
                     ], check=True, stderr=subprocess.STDOUT)
     print("Migration done")
