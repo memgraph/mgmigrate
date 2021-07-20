@@ -1,13 +1,13 @@
 #include "source/mysql.hpp"
 
+#include <algorithm>
+#include <cctype>
+
 #include <glog/logging.h>
 #include <mysqlx/devapi/common.h>
 #include <mysqlx/devapi/document.h>
 #include <mysqlx/devapi/result.h>
 #include <mysqlx/xdevapi.h>
-
-#include <algorithm>
-#include <cctype>
 #include <mgclient-value.hpp>
 
 #include "source/schema_info.hpp"

@@ -1,7 +1,7 @@
+#include <iostream>
+
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-
-#include <iostream>
 
 #include "memgraph_client.hpp"
 #include "memgraph_destination.hpp"
@@ -40,7 +40,7 @@ DEFINE_string(destination_username, "",
               "Username for the destination database.");
 DEFINE_string(destination_password, "",
               "Password for the destination database.");
-DEFINE_bool(destination_use_ssl, true,
+DEFINE_bool(destination_use_ssl, false,
             "Use SSL when connecting to the destination database.");
 
 /// Compares if two endpoints are the same.

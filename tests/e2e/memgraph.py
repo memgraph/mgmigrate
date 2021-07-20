@@ -27,7 +27,7 @@ def CleanMemgraph(host, port):
             cursor.fetchall()
         else:
             assert constraint_type == 'unique', "Invalid constraint type"
-            property_list = ', '.join([f'n.{p}' for p in properties])
+            property_list = ', '.join(f'n.{p}' for p in properties)
             cursor.execute(
                 f'DROP CONSTRAINT ON (n:{label}) ASSERT {property_list} IS UNIQUE')
             cursor.fetchall()
@@ -111,5 +111,5 @@ def ValidateImdb(labels_with_prefix):
         ('unique',
          f'{label_prefix}tvepisodes',
          ['episode_id'])]
-    assert len(rows) == len(expected_rows) and all([elem in rows for elem in expected_rows]
+    assert len(rows) == len(expected_rows) and all(elem in rows for elem in expected_rows
                                                    ), f"Invalid constraints returned. Constraints: {rows}, expected constaints: {expected_rows}"
