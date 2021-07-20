@@ -26,7 +26,7 @@ def SetupPostgres():
     cursor = conn.cursor()
     cursor.execute("CREATE DATABASE imdb")
 
-    with open('dataset/imdb_postgresql_dump.sql', 'r') as dump:
+    with open('dataset/imdb_postgresql.sql', 'r') as dump:
         subprocess.run(['docker',
                         'exec',
                         '-i',

@@ -26,7 +26,7 @@ DEFINE_int32(source_port, 0,
              "database and 5432 for PostgreSQL database.");
 DEFINE_string(source_username, "", "Username for the source database");
 DEFINE_string(source_password, "", "Password for the source database");
-DEFINE_bool(source_use_ssl, true,
+DEFINE_bool(source_use_ssl, false,
             "Use SSL when connecting to the source database.");
 DEFINE_string(source_database, "",
               "Database name. Applicable to PostgreSQL source.");

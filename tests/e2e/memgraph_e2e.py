@@ -22,7 +22,7 @@ def SetupSourceMemgraph():
         port=MEMGRAPH_SOURCE_PORT)
     conn.autocommit = True
     cursor = conn.cursor()
-    with open('dataset/imdb_memgraph_cypher', 'r') as dump:
+    with open('dataset/imdb_memgraph.cypher', 'r') as dump:
         for query in dump.readlines():
             cursor.execute(query)
             cursor.fetchall()

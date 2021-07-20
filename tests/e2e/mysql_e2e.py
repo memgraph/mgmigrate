@@ -29,7 +29,7 @@ def SetupMysql():
     cursor = conn.cursor()
     cursor.execute("CREATE DATABASE imdb")
 
-    with open('dataset/imdb_mysql_dump.sql', 'r') as dump:
+    with open('dataset/imdb_mysql.sql', 'r') as dump:
         subprocess.run(['docker',
                         'exec',
                         '-i',
