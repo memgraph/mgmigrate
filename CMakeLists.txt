@@ -2,16 +2,6 @@ cmake_minimum_required(VERSION 3.4)
 
 project(mg_import VERSION 0.0.1)
 
-# Find and set Clang compilers.
-find_program(CLANG_FOUND clang)
-find_program(CLANGXX_FOUND clang++)
-if(CLANG_FOUND AND CLANGXX_FOUND)
-  set(CMAKE_C_COMPILER "${CLANG_FOUND}")
-  set(CMAKE_CXX_COMPILER "${CLANGXX_FOUND}")
-else()
-  message(FATAL_ERROR "Couldn't find clang and/or clang++!")
-endif()
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 
 set(CMAKE_C_STANDARD 11)
@@ -33,9 +23,6 @@ include(ExternalProject)
 
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
-
-# Setup PostgreSQL
-find_package(PostgreSQL REQUIRED)
 
 # Setup gflags
 set(GFLAGS_ROOT ${PROJECT_BINARY_DIR}/gflags)
@@ -160,7 +147,7 @@ ExternalProject_Add(gtest-proj
   PREFIX            ${GTEST_ROOT}
   INSTALL_DIR       ${GTEST_ROOT}
   GIT_REPOSITORY    https://github.com/google/googletest.git
-  GIT_TAG           v1.10.x
+  GIT_TAG           release-1.11.0
   CMAKE_ARGS        "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
                     "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
                     "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
