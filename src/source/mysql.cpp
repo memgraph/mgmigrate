@@ -4,7 +4,6 @@
 #include <cctype>
 
 #include <glog/logging.h>
-
 #include <mysqlx/devapi/common.h>
 #include <mysqlx/devapi/document.h>
 #include <mysqlx/devapi/result.h>
@@ -14,7 +13,8 @@
 #include "source/schema_info.hpp"
 
 namespace {
-const std::string kSchemaBlacklist = "('information_schema')";
+const std::string kSchemaBlacklist =
+    "('information_schema', 'sys', 'mysql', 'performance_schema')";
 
 std::vector<std::pair<std::string, std::string>> ListAllTables(
     const MysqlClient &client) {
@@ -286,7 +286,8 @@ std::vector<SchemaInfo::UniqueConstraint> ListAllUniqueConstraints(
                         " JOIN information_schema.key_column_usage as kcu"
                         "   USING (constraint_name, table_schema, table_name) "
                         "WHERE tc.constraint_type IN ('UNIQUE', 'PRIMARY KEY') "
-                        "ORDER BY tc.constraint_name")
+                        "AND tc.table_schema NOT IN " +
+                        kSchemaBlacklist + "ORDER BY tc.constraint_name")
                     .execute();
     if (rows.count() == 0) {
       LOG(WARNING) << "No unique constraints found!";
@@ -384,9 +385,10 @@ std::unique_ptr<MysqlClient> MysqlClient::Connect(
     const MysqlClient::Params &params) {
   try {
     auto session = std::make_unique<mysqlx::Session>(
+        mysqlx::SessionOption::HOST, params.host, mysqlx::SessionOption::PORT,
+        params.port, mysqlx::SessionOption::AUTH, mysqlx::AuthMethod::PLAIN,
         mysqlx::SessionOption::USER, params.username,
-        mysqlx::SessionOption::PWD, params.password,
-        mysqlx::SessionOption::HOST, params.host, mysqlx::SessionOption::DB,
+        mysqlx::SessionOption::PWD, params.password, mysqlx::SessionOption::DB,
         params.database, mysqlx::SessionOption::SSL_MODE,
         mysqlx::SSLMode::REQUIRED);
 

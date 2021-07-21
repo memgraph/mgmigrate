@@ -1,0 +1,77 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build_and_test_linux:
+    strategy:
+     matrix:
+        platform: [ubuntu-20.04]
+    runs-on: ${{ matrix.platform }}
+
+    services:
+      postgres:
+        image: postgres:13.3
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --name postgres
+      memgraph-destination:
+        image: memgraph/memgraph:1.6.0-community
+        ports:
+          - 7687:7687
+        options: >-
+          --name memgraph-destination
+          -i
+          --entrypoint /bin/bash
+      memgraph-source:
+        image: memgraph/memgraph:1.6.0-community
+        ports:
+          - 7688:7687
+        options: >-
+          --name memgraph-source
+          -i
+          --entrypoint /bin/bash
+      mysql:
+        image: mysql/mysql-server:8.0
+        ports:
+          - 3306:3306
+          - 33060:33060
+        env:
+          MYSQL_ROOT_PASSWORD: mysql
+        options: >-
+          --name mysql
+
+    steps:
+      - name: Set-up repository
+        uses: actions/checkout@v2
+      - name: Install environment
+        run: |
+          sudo apt install -y gcc g++ python3
+          pip3 install pymgclient psycopg2 mysql-connector-python
+      - name: Start Memgraph Source and Destination
+        run: |
+          docker exec -i -d memgraph-source /usr/lib/memgraph/memgraph --telemetry-enabled=false
+          docker exec -i -d memgraph-destination /usr/lib/memgraph/memgraph --telemetry-enabled=false
+      - name: Build mgmigrate 
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_BUILD_TYPE=Release ..
+          make -j8
+      - name: Test PostgreSQL
+        run: |
+          cd tests/e2e
+          ./postgresql_e2e.py
+      - name: Test MySQL
+        run: |
+          cd tests/e2e
+          docker exec -i mysql mysql --user=root --password=mysql -e "CREATE USER 'root'@'%' IDENTIFIED BY 'mysql'"
+          docker exec -i mysql mysql --user=root --password=mysql -e "GRANT ALL ON *.* to root@'%'"
+
+          ./mysql_e2e.py
+      - name: Test Memgraph
+        run: |
+          cd tests/e2e
+          ./memgraph_e2e.py

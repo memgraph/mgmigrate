@@ -208,7 +208,7 @@ void RemoveLabelFromNodes(MemgraphClient *client,
                           const std::string_view &label) {
   const std::string query = "MATCH (u) REMOVE u:" + EscapeName(label) + ";";
   CHECK(client->Execute(query)) << "Couldn't remove a label from nodes!";
-  CHECK(!client->Execute(query))
+  CHECK(!client->FetchOne())
       << "Unexpected data received while removing a label from nodes!";
 }
 
@@ -216,6 +216,6 @@ void RemovePropertyFromNodes(MemgraphClient *client,
                              const std::string_view &property) {
   const std::string query = "MATCH (u) REMOVE u." + EscapeName(property) + ";";
   CHECK(client->Execute(query)) << "Couldn't remove a property from nodes!";
-  CHECK(!client->Execute(query))
+  CHECK(!client->FetchOne())
       << "Unexpected data received while removing a property from nodes!";
 }
