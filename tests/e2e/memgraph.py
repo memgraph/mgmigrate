@@ -4,7 +4,7 @@ MEMGRAPH_DESTINATION_HOST = '127.0.0.1'
 MEMGRAPH_DESTINATION_PORT = 7687
 
 
-def CleanMemgraph(host, port):
+def clean_memgraph(host, port):
     conn = mgclient.connect(host=host, port=port)
     conn.autocommit = True
     cursor = conn.cursor()
@@ -37,7 +37,7 @@ def CleanMemgraph(host, port):
     assert len(rows) == 0, "Failed to clean constraints"
 
 
-def ValidateImdb(labels_with_prefix):
+def validate_imdb(labels_with_prefix):
     label_prefix = 'imdb_' if labels_with_prefix else ''
     conn = mgclient.connect(
         host=MEMGRAPH_DESTINATION_HOST,

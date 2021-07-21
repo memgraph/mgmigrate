@@ -5,12 +5,12 @@ import mysql.connector as mysql
 import memgraph
 
 import subprocess
-import os
+import pathlib
 import atexit
 
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-PROJECT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", ".."))
-BUILD_DIR = os.path.join(PROJECT_DIR, "build")
+SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
+PROJECT_DIR = SCRIPT_DIR.parents[1]
+BUILD_DIR = PROJECT_DIR.joinpath("build")
 
 MYSQL_HOST = '127.0.0.1'
 MYSQL_USERNAME = 'root'
@@ -19,7 +19,7 @@ MYSQLX_PORT = 33060
 MYSQL_PORT = 3306
 
 
-def SetupMysql():
+def setup_mysql():
     conn = mysql.connect(
         host=MYSQL_HOST,
         user=MYSQL_USERNAME,
@@ -42,7 +42,7 @@ def SetupMysql():
                        stdin=dump)
 
 
-def TeardownMysql():
+def teardown_mysql():
     conn = mysql.connect(
         host=MYSQL_HOST,
         user=MYSQL_USERNAME,
@@ -54,20 +54,20 @@ def TeardownMysql():
 
 if __name__ == '__main__':
     print("Preparing Memgraph")
-    memgraph.CleanMemgraph(
+    memgraph.clean_memgraph(
         memgraph.MEMGRAPH_DESTINATION_HOST,
         memgraph.MEMGRAPH_DESTINATION_PORT)
     atexit.register(
-        lambda: memgraph.CleanMemgraph(
+        lambda: memgraph.clean_memgraph(
             memgraph.MEMGRAPH_DESTINATION_HOST,
             memgraph.MEMGRAPH_DESTINATION_PORT))
 
     print("Preparing MySQL")
-    SetupMysql()
-    atexit.register(TeardownMysql)
+    setup_mysql()
+    atexit.register(teardown_mysql)
 
     print("Migrating data from MySQL to Memgraph")
-    subprocess.run([BUILD_DIR + '/src/mg_migrate',
+    subprocess.run([str(BUILD_DIR / 'src/mg_migrate'),
                     '--source-kind=mysql',
                     '--source-host',
                     MYSQL_HOST,
@@ -87,5 +87,5 @@ if __name__ == '__main__':
     print("Migration done")
 
     print("Validating Memgraph data")
-    memgraph.ValidateImdb(True)
+    memgraph.validate_imdb(True)
     print("Validation passed")

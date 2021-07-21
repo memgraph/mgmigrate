@@ -6,12 +6,12 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import memgraph
 
 import subprocess
-import os
+import pathlib
 import atexit
 
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-PROJECT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", ".."))
-BUILD_DIR = os.path.join(PROJECT_DIR, "build")
+SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
+PROJECT_DIR = SCRIPT_DIR.parents[1]
+BUILD_DIR = PROJECT_DIR.joinpath("build")
 
 POSTGRES_HOST = '127.0.0.1'
 POSTGRES_USERNAME = 'postgres'
@@ -19,7 +19,7 @@ POSTGRES_PASSWORD = 'postgres'
 POSTGRES_PORT = 5432
 
 
-def SetupPostgres():
+def setup_postgres():
     conn = psycopg2.connect(
         host=POSTGRES_HOST, user=POSTGRES_USERNAME, password=POSTGRES_PASSWORD)
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
@@ -42,7 +42,7 @@ def SetupPostgres():
                        stdin=dump)
 
 
-def TeardownPostgres():
+def teardown_postgres():
     conn = psycopg2.connect(
         host=POSTGRES_HOST, user=POSTGRES_USERNAME, password=POSTGRES_PASSWORD)
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
@@ -52,20 +52,20 @@ def TeardownPostgres():
 
 if __name__ == '__main__':
     print("Preparing Memgraph")
-    memgraph.CleanMemgraph(
+    memgraph.clean_memgraph(
         memgraph.MEMGRAPH_DESTINATION_HOST,
         memgraph.MEMGRAPH_DESTINATION_PORT)
     atexit.register(
-        lambda: memgraph.CleanMemgraph(
+        lambda: memgraph.clean_memgraph(
             memgraph.MEMGRAPH_DESTINATION_HOST,
             memgraph.MEMGRAPH_DESTINATION_PORT))
 
     print("Preparing Postgres")
-    SetupPostgres()
-    atexit.register(TeardownPostgres)
+    setup_postgres()
+    atexit.register(teardown_postgres)
 
     print("Migrating data from Postgres to Memgraph")
-    subprocess.run([BUILD_DIR + '/src/mg_migrate',
+    subprocess.run([str(BUILD_DIR / 'src/mg_migrate'),
                     '--source-kind=postgresql',
                     '--source-host',
                     POSTGRES_HOST,
@@ -85,5 +85,5 @@ if __name__ == '__main__':
     print("Migration done")
 
     print("Validating Memgraph data")
-    memgraph.ValidateImdb(False)
+    memgraph.validate_imdb(False)
     print("Validation passed")
