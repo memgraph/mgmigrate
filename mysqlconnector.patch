@@ -1,0 +1,15 @@
+diff --git a/cdk/cmake/DepFindSSL.cmake b/cdk/cmake/DepFindSSL.cmake
+index 4ec374aa..3680f83d 100644
+--- a/cdk/cmake/DepFindSSL.cmake
++++ b/cdk/cmake/DepFindSSL.cmake
+@@ -120,7 +120,9 @@ function(main)
+ 
+     set_target_properties(openssl-applink PROPERTIES FOLDER "Misc")
+     # Remove warnings from openssl applink.c
+-    target_compile_options(openssl-applink PRIVATE /wd4152 /wd4996)
++    if (MSVC)
++	    target_compile_options(openssl-applink PRIVATE /wd4152 /wd4996)
++    endif()
+ 
+   endif()
+ 
