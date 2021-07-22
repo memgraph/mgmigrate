@@ -114,40 +114,32 @@ add_dependencies(pqxx pqxx-proj)
 
 include_directories(${PQXX_INCLUDE_DIR})
 
-FetchContent_Declare(
-  mysqlconnector
-  GIT_REPOSITORY git@github.com:mysql/mysql-connector-cpp.git
-  GIT_TAG        8.0.26
-  PATCH_COMMAND git apply --ignore-space-change --ignore-whitespace ${CMAKE_CURRENT_SOURCE_DIR}/mysqlconnector.patch
-)
-
-FetchContent_MakeAvailable(mysqlconnector)
-
 # Setup MySQL Connector/C++
-#set(MYSQL_CONN_ROOT ${PROJECT_BINARY_DIR}/mysqlconnector)
-#ExternalProject_Add(mysqlconnector-proj
-#  PREFIX         ${MYSQL_CONN_ROOT}
-#  INSTALL_DIR    ${MYSQL_CONN_ROOT}
-#  GIT_REPOSITORY https://github.com/mysql/mysql-connector-cpp
-#  GIT_TAG        8.0.25
-#  CMAKE_ARGS     "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
-#  "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
-#  "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
-#  "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
-#  "-DBUILD_STATIC=ON"
-#  "-DBUILD_TEST=OFF")
+set(MYSQL_CONN_ROOT ${PROJECT_BINARY_DIR}/mysqlconnector)
+ExternalProject_Add(mysqlconnector-proj
+  PREFIX         ${MYSQL_CONN_ROOT}
+  INSTALL_DIR    ${MYSQL_CONN_ROOT}
+  GIT_REPOSITORY https://github.com/mysql/mysql-connector-cpp
+  GIT_TAG        8.0.26
+  PATCH_COMMAND  PATCH_COMMAND git apply --reject --ignore-space-change --ignore-whitespace ${CMAKE_CURRENT_SOURCE_DIR}/mysqlconnector.patch
+  CMAKE_ARGS     "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
+  "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+  "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+  "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+  "-DBUILD_STATIC=ON"
+  "-DBUILD_TEST=OFF")
 
-#set(MYSQL_CONN_INCLUDE_DIR ${MYSQL_CONN_ROOT}/include)
-#set(MYSQL_CONN_LIBRARY_PATH ${MYSQL_CONN_ROOT}/lib64/${CMAKE_FIND_LIBRARY_PREFIXES}mysqlcppconn8-static.a)
-#set(MYSQL_CONN_DEBUG_LIBRARY_PATH ${MYSQL_CONN_ROOT}/lib64/debug/${CMAKE_FIND_LIBRARY_PREFIXES}mysqlcppconn8-static.a)
-#add_library(mysqlconnector STATIC IMPORTED)
-#set_target_properties(mysqlconnector PROPERTIES
-#  IMPORTED_LOCATION "${MYSQL_CONN_LIBRARY_PATH}"
-#  IMPORTED_LOCATION_DEBUG "${MYSQL_CONN_DEBUG_LIBRARY_PATH}"
-#  INTERFACE_LINK_LIBRARIES "${OPENSSL_LIBRARIES};${THREADS_LIBRARIES};resolv")
-#add_dependencies(mysqlconnector mysqlconnector-proj)
+set(MYSQL_CONN_INCLUDE_DIR ${MYSQL_CONN_ROOT}/include)
+set(MYSQL_CONN_LIBRARY_PATH ${MYSQL_CONN_ROOT}/lib64/${CMAKE_FIND_LIBRARY_PREFIXES}mysqlcppconn8-static.a)
+set(MYSQL_CONN_DEBUG_LIBRARY_PATH ${MYSQL_CONN_ROOT}/lib64/debug/${CMAKE_FIND_LIBRARY_PREFIXES}mysqlcppconn8-static.a)
+add_library(mysqlconnector STATIC IMPORTED)
+set_target_properties(mysqlconnector PROPERTIES
+  IMPORTED_LOCATION "${MYSQL_CONN_LIBRARY_PATH}"
+  IMPORTED_LOCATION_DEBUG "${MYSQL_CONN_DEBUG_LIBRARY_PATH}"
+  INTERFACE_LINK_LIBRARIES "${OPENSSL_LIBRARIES};${THREADS_LIBRARIES};resolv")
+add_dependencies(mysqlconnector mysqlconnector-proj)
 
-#include_directories(${MYSQL_CONN_INCLUDE_DIR})
+include_directories(${MYSQL_CONN_INCLUDE_DIR})
 
 
 # Setup gtest
