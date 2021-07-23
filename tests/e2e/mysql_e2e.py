@@ -67,7 +67,7 @@ if __name__ == '__main__':
     atexit.register(teardown_mysql)
 
     print("Migrating data from MySQL to Memgraph")
-    subprocess.run([str(BUILD_DIR / 'src/mg_migrate'),
+    subprocess.run([str(BUILD_DIR / 'src/mgmigrate'),
                     '--source-kind=mysql',
                     '--source-host',
                     MYSQL_HOST,

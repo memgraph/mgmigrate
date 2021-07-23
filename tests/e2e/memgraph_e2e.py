@@ -47,7 +47,7 @@ if __name__ == '__main__':
     setup_source_memgraph()
 
     print("Migrating data from Memgraph to Memgraph")
-    subprocess.run([str(BUILD_DIR / 'src/mg_migrate'),
+    subprocess.run([str(BUILD_DIR / 'src/mgmigrate'),
                     '--source-kind=memgraph',
                     '--source-host',
                     MEMGRAPH_SOURCE_HOST,
