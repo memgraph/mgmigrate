@@ -13,3 +13,25 @@ index 4ec374aa..3680f83d 100644
  
    endif()
  
+diff --git a/cmake/libutils/merge_archives.cmake.in b/cmake/libutils/merge_archives.cmake.in
+index eebbdb73..8b8bc602 100644
+--- a/cmake/libutils/merge_archives.cmake.in
++++ b/cmake/libutils/merge_archives.cmake.in
+@@ -319,10 +319,15 @@ function(merge_libraries_gcc)
+   #
+   # TODO: Do we need any linking options to pass here?
+ 
++  list(JOIN merge_objs " " joined_objs)
++  file(WRITE objects ${joined_objs})
+   execute_process(
+-    COMMAND ${CMAKE_AR} -r ${TARGET} ${merge_objs}
+-    RESULT_VARIABLE res
++    COMMAND cat objects
++    COMMAND xargs ${CMAKE_AR} -r ${TARGET}
+   )
++  if (res)
++    message(FATAL_ERROR "FAILED AR")
++  endif()
+   execute_process(
+     COMMAND ${CMAKE_RANLIB} ${TARGET}
+     RESULT_VARIABLE res1
