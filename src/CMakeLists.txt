@@ -34,5 +34,6 @@ install(TARGETS mgmigrate
         RUNTIME DESTINATION bin)
 
 if(MGMIGRATE_ON_WINDOWS)
-  install(FILES ${PostgreSQL_LIBRARY_DIRS}/libpq.dll DESTINATION bin)
+  string(REGEX REPLACE "(.*)/lib" "\\1/bin" PostgreSQL_RUNTIME_DIR ${PostgreSQL_LIBRARY_DIRS})
+  install(FILES ${PostgreSQL_RUNTIME_DIR}/libpq.dll DESTINATION bin)
 endif()

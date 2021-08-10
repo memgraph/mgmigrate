@@ -42,7 +42,7 @@ find_package(PostgreSQL REQUIRED)
 if (MGMIGRATE_ON_WINDOWS)
   set(GFLAGS_LIB_SUFFIX "_static")
   set(CMAKE_CXX_STANDARD_LIBRARIES "-static-libgcc -static-libstdc++")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic")
 elseif(MGMIGRATE_ON_LINUX)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
 endif()
@@ -100,8 +100,6 @@ ExternalProject_Add(mgclient-proj
   GIT_TAG           v1.2.1
   GIT_REPOSITORY    https://github.com/memgraph/mgclient.git
   CMAKE_ARGS        "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
-                    "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
-                    "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
                     "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
                     "-DBUILD_TESTING=OFF")
 
@@ -120,7 +118,7 @@ ExternalProject_Add(pqxx-proj
   PREFIX            ${PQXX_ROOT}
   INSTALL_DIR       ${PQXX_ROOT}
   GIT_REPOSITORY    https://github.com/jtv/libpqxx.git
-  GIT_TAG           7.5.2
+  GIT_TAG           7.6.0
   CMAKE_ARGS        "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
   "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
   "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
