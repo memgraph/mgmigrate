@@ -30,3 +30,9 @@ if(MGMIGRATE_ON_WINDOWS)
   target_link_libraries(mgmigrate shlwapi)
 endif()
 
+install(TARGETS mgmigrate
+        RUNTIME DESTINATION bin)
+
+if(MGMIGRATE_ON_WINDOWS)
+  install(FILES ${PostgreSQL_LIBRARY_DIRS}/libpq.dll DESTINATION bin)
+endif()

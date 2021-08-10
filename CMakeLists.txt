@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.14)
 
-project(mg_import VERSION 0.0.1)
+project(mgmigrate VERSION 0.0.1)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 
@@ -31,13 +31,20 @@ endif()
 # ------------------------------------------------------------------------------
 
 include(ExternalProject)
-include(FetchContent)
 
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+
+find_package(PostgreSQL REQUIRED)
 
 if (MGMIGRATE_ON_WINDOWS)
   set(GFLAGS_LIB_SUFFIX "_static")
+  set(CMAKE_CXX_STANDARD_LIBRARIES "-static-libgcc -static-libstdc++")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive")
+elseif(MGMIGRATE_ON_LINUX)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
 endif()
 
 # Setup gflags
@@ -113,7 +120,7 @@ ExternalProject_Add(pqxx-proj
   PREFIX            ${PQXX_ROOT}
   INSTALL_DIR       ${PQXX_ROOT}
   GIT_REPOSITORY    https://github.com/jtv/libpqxx.git
-  GIT_TAG           7.1.2
+  GIT_TAG           7.5.2
   CMAKE_ARGS        "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
   "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
   "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
