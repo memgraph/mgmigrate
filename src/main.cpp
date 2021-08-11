@@ -349,6 +349,8 @@ int main(int argc, char **argv) {
   gflags::SetUsageMessage(kUsage);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
+  mg::Client::Init();
+
   auto source_port = GetSourcePort(FLAGS_source_port, FLAGS_source_kind);
 
   // TODO(tsabolcec): Implement better validation for IP addresses.
@@ -418,5 +420,6 @@ int main(int argc, char **argv) {
               << "'. Please run 'mg_migrate --help' to see options.";
   }
 
+  mg::Client::Finalize();
   return 0;
 }
