@@ -21,13 +21,9 @@ if(MGMIGRATE_ON_WINDOWS)
   target_link_libraries(mgmigrate-lib ws2_32 dnsapi pq)
 else()
   target_link_libraries(mgmigrate-lib resolv)
-  target_link_libraries(mgmigrate-lib
-                        ${PostgreSQL_LIBRARY_DIRS}/libpq.a
-                        ${PostgreSQL_LIBRARY_DIRS}/libpgport.a
-                        ${PostgreSQL_LIBRARY_DIRS}/libpgcommon.a
-                        ${GSS_LIBRARIES}
-                        ldap)
+  target_link_libraries(mgmigrate-lib ${MGMIGRATE_POSTGRESQL_LIBRARIES})
 endif()
+
 target_compile_definitions(mgmigrate-lib PUBLIC MGCLIENT_STATIC_DEFINE)
 
 add_executable(mgmigrate main.cpp)

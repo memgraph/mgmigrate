@@ -35,15 +35,23 @@ include(ExternalProject)
 
 find_package(OpenSSL REQUIRED)
 
-if (MGMIGRATE_ON_OSX)
-  find_package(GSS REQUIRED)
-endif()
-
 find_package(Threads REQUIRED)
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
 find_package(PostgreSQL REQUIRED)
+
+# Setup gflags
+set(POSTGRESQL_ROOT ${PROJECT_BINARY_DIR}/postgresql)
+ExternalProject_Add(postgresql-proj
+  PREFIX            ${POSTGRESQL_ROOT}
+  INSTALL_DIR       ${POSTGRESQL_ROOT}
+  URL               https://ftp.postgresql.org/pub/source/v13.3/postgresql-13.3.tar.gz
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND     unset MAKEFLAGS && unset MFLAGS && unset MAKELEVEL && ${CMAKE_CURRENT_SOURCE_DIR}/build-libpq.py <SOURCE_DIR> <INSTALL_DIR>
+  INSTALL_COMMAND   "")
+
+set(MGMIGRATE_POSTGRESQL_LIBRARIES ${POSTGRESQL_ROOT}/libpq.a ${POSTGRESQL_ROOT}/libpgcommon.a ${POSTGRESQL_ROOT}/libpgport.a)
 
 if (MGMIGRATE_ON_WINDOWS)
   set(GFLAGS_LIB_SUFFIX "_static")
@@ -101,9 +109,6 @@ add_dependencies(glog glog-proj)
 if (MGMIGRATE_ON_OSX)
   set(MGMIGRATE_MGCLIENT_OPENSSL_ROOTDIR_FLAG "-DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}")
 endif()
-
-message(WARNING ${MGMIGRATE_MGCLIENT_OPENSSL_ROOTDIR_FLAG})
-
 
 # Setup mgclient
 set(MG_CLIENT_ROOT ${PROJECT_BINARY_DIR}/mgclient)
