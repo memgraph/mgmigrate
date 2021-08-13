@@ -128,13 +128,13 @@ jobs:
       - name: Build mgmigrate
         run: |
           mkdir build && cd build
-          cmake -DOPENSSL_ROOT_DIR="$(ls -rd -- /usr/local/Cellar/openssl@1.1/* | head -n 1)" -DCMAKE_INSTALL_PREFIX=. ..
+          cmake -DCMAKE_BUILD_TYPE=Release -DOPENSSL_ROOT_DIR="$(ls -rd -- /usr/local/Cellar/openssl@1.1/* | head -n 1)" -DCMAKE_INSTALL_PREFIX=. ..
           make -j8
           make install -j8
 
       - name: Save mgmigrate
         uses: actions/upload-artifact@v2
         with:
-          name: "mgmigrate_MacOSX"
+          name: "mgmigrate_macOSX"
           path: |
             build/bin

@@ -30,11 +30,9 @@ endif()
 # --------------------------- EXTERNAL DEPENDENCIES ----------------------------
 # ------------------------------------------------------------------------------
 
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 include(ExternalProject)
 
 find_package(OpenSSL REQUIRED)
-
 find_package(Threads REQUIRED)
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
