@@ -1,7 +1,6 @@
 name: CI
 
-on:
-  pull_request:
+on: [push]
 
 jobs:
   build_and_test_linux:
@@ -111,5 +110,31 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: "mgmigrate_Windows"
+          path: |
+            build/bin
+
+  build_and_test_macosx:
+    strategy:
+     matrix:
+        platform: [macos-10.15]
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Set-up repository
+        uses: actions/checkout@v2
+      - name: Install environment
+        run: |
+          brew install postgresql
+      - name: Build mgmigrate
+        run: |
+          mkdir build && cd build
+          cmake -DOPENSSL_ROOT_DIR="$(ls -rd -- /usr/local/Cellar/openssl@1.1/* | head -n 1)" -DCMAKE_INSTALL_PREFIX=. ..
+          make -j8
+          make install -j8
+
+      - name: Save mgmigrate
+        uses: actions/upload-artifact@v2
+        with:
+          name: "mgmigrate_MacOSX"
           path: |
             build/bin
