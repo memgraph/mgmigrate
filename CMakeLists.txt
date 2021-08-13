@@ -41,17 +41,19 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
 find_package(PostgreSQL REQUIRED)
 
-# Setup gflags
-set(POSTGRESQL_ROOT ${PROJECT_BINARY_DIR}/postgresql)
-ExternalProject_Add(postgresql-proj
-  PREFIX            ${POSTGRESQL_ROOT}
-  INSTALL_DIR       ${POSTGRESQL_ROOT}
-  URL               https://ftp.postgresql.org/pub/source/v13.3/postgresql-13.3.tar.gz
-  CONFIGURE_COMMAND ""
-  BUILD_COMMAND     unset MAKEFLAGS && unset MFLAGS && unset MAKELEVEL && ${CMAKE_CURRENT_SOURCE_DIR}/build-libpq.py <SOURCE_DIR> <INSTALL_DIR>
-  INSTALL_COMMAND   "")
+if (MGMIGRATE_ON_LINUX OR MGMIGRATE_ON_OSX)
+  # We build static libpq.a manually so we have a lib with minimal dependencies
+  set(POSTGRESQL_ROOT ${PROJECT_BINARY_DIR}/postgresql)
+  ExternalProject_Add(postgresql-proj
+    PREFIX            ${POSTGRESQL_ROOT}
+    INSTALL_DIR       ${POSTGRESQL_ROOT}
+    URL               https://ftp.postgresql.org/pub/source/v13.3/postgresql-13.3.tar.gz
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND     unset MAKEFLAGS && unset MFLAGS && unset MAKELEVEL && ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-libpq.py <SOURCE_DIR> <INSTALL_DIR>
+    INSTALL_COMMAND   "")
 
-set(MGMIGRATE_POSTGRESQL_LIBRARIES ${POSTGRESQL_ROOT}/libpq.a ${POSTGRESQL_ROOT}/libpgcommon.a ${POSTGRESQL_ROOT}/libpgport.a)
+  set(MGMIGRATE_POSTGRESQL_LIBRARIES ${POSTGRESQL_ROOT}/libpq.a ${POSTGRESQL_ROOT}/libpgcommon.a ${POSTGRESQL_ROOT}/libpgport.a)
+endif()
 
 if (MGMIGRATE_ON_WINDOWS)
   set(GFLAGS_LIB_SUFFIX "_static")
