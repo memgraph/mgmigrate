@@ -39,6 +39,20 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
 find_package(PostgreSQL REQUIRED)
 
+if (MGMIGRATE_ON_LINUX OR MGMIGRATE_ON_OSX)
+  # We build static libpq.a manually so we have a lib with minimal dependencies
+  set(POSTGRESQL_ROOT ${PROJECT_BINARY_DIR}/postgresql)
+  ExternalProject_Add(postgresql-proj
+    PREFIX            ${POSTGRESQL_ROOT}
+    INSTALL_DIR       ${POSTGRESQL_ROOT}
+    URL               https://ftp.postgresql.org/pub/source/v13.3/postgresql-13.3.tar.gz
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND     unset MAKEFLAGS && unset MFLAGS && unset MAKELEVEL && ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-libpq.py <SOURCE_DIR> <INSTALL_DIR>
+    INSTALL_COMMAND   "")
+
+  set(MGMIGRATE_POSTGRESQL_LIBRARIES ${POSTGRESQL_ROOT}/libpq.a ${POSTGRESQL_ROOT}/libpgcommon.a ${POSTGRESQL_ROOT}/libpgport.a)
+endif()
+
 if (MGMIGRATE_ON_WINDOWS)
   set(GFLAGS_LIB_SUFFIX "_static")
   set(CMAKE_CXX_STANDARD_LIBRARIES "-static-libgcc -static-libstdc++")
@@ -92,6 +106,10 @@ set_target_properties(glog PROPERTIES
   INTERFACE_LINK_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}")
 add_dependencies(glog glog-proj)
 
+if (MGMIGRATE_ON_OSX)
+  set(MGMIGRATE_MGCLIENT_OPENSSL_ROOTDIR_FLAG "-DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}")
+endif()
+
 # Setup mgclient
 set(MG_CLIENT_ROOT ${PROJECT_BINARY_DIR}/mgclient)
 ExternalProject_Add(mgclient-proj
@@ -103,6 +121,7 @@ ExternalProject_Add(mgclient-proj
                     "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
                     "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
                     "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+                    ${MGMIGRATE_MGCLIENT_OPENSSL_ROOTDIR_FLAG}
                     "-DBUILD_TESTING=OFF")
 
 set(MG_CLIENT_INCLUDE_DIR ${MG_CLIENT_ROOT}/include)
@@ -125,6 +144,7 @@ ExternalProject_Add(pqxx-proj
   "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
   "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
   "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+  "-DBUILD_SHARED_LIBS=OFF"
   "-DBUILD_TEST=OFF")
 
 set(PQXX_INCLUDE_DIR ${PQXX_ROOT}/include)
@@ -136,6 +156,10 @@ set_target_properties(pqxx PROPERTIES
 add_dependencies(pqxx pqxx-proj)
 
 include_directories(${PQXX_INCLUDE_DIR})
+
+if (MGMIGRATE_ON_OSX)
+  set(MGMIGRATE_MYSQL_CONN_OPENSSL_ROOTDIR_FLAG "-DWITH_SSL=${OPENSSL_ROOT_DIR}")
+endif()
 
 # Setup MySQL Connector/C++
 set(MYSQL_CONN_ROOT ${PROJECT_BINARY_DIR}/mysqlconnector)
@@ -150,6 +174,7 @@ ExternalProject_Add(mysqlconnector-proj
   "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
   "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
   "-DBUILD_STATIC=ON"
+  ${MGMIGRATE_MYSQL_CONN_OPENSSL_ROOTDIR_FLAG}
   "-DBUILD_TEST=OFF")
 
 set(MYSQL_CONN_INCLUDE_DIR ${MYSQL_CONN_ROOT}/include)

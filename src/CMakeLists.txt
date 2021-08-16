@@ -16,12 +16,14 @@ set(MG_MIGRATE_LIB_SOURCES
 add_compile_options(-Wall -Wextra -Wredundant-move)
 
 add_library(mgmigrate-lib ${MG_MIGRATE_LIB_SOURCES})
-target_link_libraries(mgmigrate-lib mgclient pqxx pq mysqlconnector glog)
+target_link_libraries(mgmigrate-lib mgclient pqxx mysqlconnector glog)
 if(MGMIGRATE_ON_WINDOWS)
-  target_link_libraries(mgmigrate-lib ws2_32 dnsapi)
+  target_link_libraries(mgmigrate-lib ws2_32 dnsapi pq)
 else()
   target_link_libraries(mgmigrate-lib resolv)
+  target_link_libraries(mgmigrate-lib ${MGMIGRATE_POSTGRESQL_LIBRARIES})
 endif()
+
 target_compile_definitions(mgmigrate-lib PUBLIC MGCLIENT_STATIC_DEFINE)
 
 add_executable(mgmigrate main.cpp)
