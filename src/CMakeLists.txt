@@ -16,8 +16,24 @@ set(MG_MIGRATE_LIB_SOURCES
 add_compile_options(-Wall -Wextra -Wredundant-move)
 
 add_library(mgmigrate-lib ${MG_MIGRATE_LIB_SOURCES})
-target_link_libraries(mgmigrate-lib mgclient glog pqxx pq mysqlconnector)
+target_link_libraries(mgmigrate-lib mgclient pqxx pq mysqlconnector glog)
+if(MGMIGRATE_ON_WINDOWS)
+  target_link_libraries(mgmigrate-lib ws2_32 dnsapi)
+else()
+  target_link_libraries(mgmigrate-lib resolv)
+endif()
+target_compile_definitions(mgmigrate-lib PUBLIC MGCLIENT_STATIC_DEFINE)
 
-add_executable(mg_migrate main.cpp)
-target_link_libraries(mg_migrate gflags glog mgmigrate-lib)
+add_executable(mgmigrate main.cpp)
+target_link_libraries(mgmigrate mgmigrate-lib gflags glog)
+if(MGMIGRATE_ON_WINDOWS)
+  target_link_libraries(mgmigrate shlwapi)
+endif()
 
+install(TARGETS mgmigrate
+        RUNTIME DESTINATION bin)
+
+if(MGMIGRATE_ON_WINDOWS)
+  string(REGEX REPLACE "(.*)/lib" "\\1/bin" PostgreSQL_RUNTIME_DIR ${PostgreSQL_LIBRARY_DIRS})
+  install(FILES ${PostgreSQL_RUNTIME_DIR}/libpq.dll DESTINATION bin)
+endif()

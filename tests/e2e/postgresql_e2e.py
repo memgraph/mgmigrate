@@ -65,7 +65,7 @@ if __name__ == '__main__':
     atexit.register(teardown_postgres)
 
     print("Migrating data from Postgres to Memgraph")
-    subprocess.run([str(BUILD_DIR / 'src/mg_migrate'),
+    subprocess.run([str(BUILD_DIR / 'src/mgmigrate'),
                     '--source-kind=postgresql',
                     '--source-host',
                     POSTGRES_HOST,

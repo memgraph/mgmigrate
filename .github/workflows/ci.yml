@@ -55,11 +55,12 @@ jobs:
         run: |
           docker exec -i -d memgraph-source /usr/lib/memgraph/memgraph --telemetry-enabled=false
           docker exec -i -d memgraph-destination /usr/lib/memgraph/memgraph --telemetry-enabled=false
-      - name: Build mgmigrate 
+      - name: Build mgmigrate
         run: |
           mkdir build && cd build
-          cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_BUILD_TYPE=Release ..
+          cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=. ..
           make -j8
+          make install -j8
       - name: Test PostgreSQL
         run: |
           cd tests/e2e
@@ -75,3 +76,39 @@ jobs:
         run: |
           cd tests/e2e
           ./memgraph_e2e.py
+      - name: Save mgmigrate
+        uses: actions/upload-artifact@v2
+        with:
+          name: "mgmigrate_Ubuntu"
+          path: |
+            build/bin
+
+  build_and_test_windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch:
+          - { mingw: "64", msys: x86_64}
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Set-up repository
+        uses: actions/checkout@v2
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW${{ matrix.arch.mingw }}
+          update: true
+          install: git base-devel mingw-w64-${{ matrix.arch.msys }}-toolchain mingw-w64-${{ matrix.arch.msys }}-cmake mingw-w64-${{ matrix.arch.msys }}-openssl mingw-w64-${{ matrix.arch.msys }}-postgresql
+      - name: Build mgmigrate
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=. ..
+          make -j8
+          make install -j8
+      - name: Save mgmigrate
+        uses: actions/upload-artifact@v2
+        with:
+          name: "mgmigrate_Windows"
+          path: |
+            build/bin
