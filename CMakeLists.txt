@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set default build type to 'Debug'
-if (NOT CMAKE_BUILD_TYPE)
+if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Debug")
 endif()
 message(STATUS "CMake build type: ${CMAKE_BUILD_TYPE}")
@@ -26,6 +26,13 @@ elseif(UNIX)
   set(MGMIGRATE_FIND_LIBRARY_PREFIXES "${CMAKE_FIND_LIBRARY_PREFIXES}")
 endif()
 
+# Set default instalation directory to '/usr'
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    # '/usr' is a special case, for more details see:
+    # https://cmake.org/cmake/help/latest/module/GNUInstallDirs.html#special-cases
+    set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "install dir" FORCE)
+endif()
+
 # ------------------------------------------------------------------------------
 # --------------------------- EXTERNAL DEPENDENCIES ----------------------------
 # ------------------------------------------------------------------------------
@@ -39,7 +46,7 @@ set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
 find_package(PostgreSQL REQUIRED)
 
-if (MGMIGRATE_ON_LINUX OR MGMIGRATE_ON_OSX)
+if(MGMIGRATE_ON_LINUX OR MGMIGRATE_ON_OSX)
   # We build static libpq.a manually so we have a lib with minimal dependencies
   set(POSTGRESQL_ROOT ${PROJECT_BINARY_DIR}/postgresql)
   ExternalProject_Add(postgresql-proj
@@ -53,7 +60,7 @@ if (MGMIGRATE_ON_LINUX OR MGMIGRATE_ON_OSX)
   set(MGMIGRATE_POSTGRESQL_LIBRARIES ${POSTGRESQL_ROOT}/libpq.a ${POSTGRESQL_ROOT}/libpgcommon.a ${POSTGRESQL_ROOT}/libpgport.a)
 endif()
 
-if (MGMIGRATE_ON_WINDOWS)
+if(MGMIGRATE_ON_WINDOWS)
   set(GFLAGS_LIB_SUFFIX "_static")
   set(CMAKE_CXX_STANDARD_LIBRARIES "-static-libgcc -static-libstdc++")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic")
@@ -106,7 +113,7 @@ set_target_properties(glog PROPERTIES
   INTERFACE_LINK_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}")
 add_dependencies(glog glog-proj)
 
-if (MGMIGRATE_ON_OSX)
+if(MGMIGRATE_ON_OSX)
   set(MGMIGRATE_MGCLIENT_OPENSSL_ROOTDIR_FLAG "-DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}")
 endif()
 
@@ -157,7 +164,7 @@ add_dependencies(pqxx pqxx-proj)
 
 include_directories(${PQXX_INCLUDE_DIR})
 
-if (MGMIGRATE_ON_OSX)
+if(MGMIGRATE_ON_OSX)
   set(MGMIGRATE_MYSQL_CONN_OPENSSL_ROOTDIR_FLAG "-DWITH_SSL=${OPENSSL_ROOT_DIR}")
 endif()
 
