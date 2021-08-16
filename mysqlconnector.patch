@@ -14,10 +14,10 @@ index 4ec374aa..3680f83d 100644
    endif()
  
 diff --git a/cmake/libutils/merge_archives.cmake.in b/cmake/libutils/merge_archives.cmake.in
-index eebbdb73..8b8bc602 100644
+index eebbdb73..e110f483 100644
 --- a/cmake/libutils/merge_archives.cmake.in
 +++ b/cmake/libutils/merge_archives.cmake.in
-@@ -319,10 +319,15 @@ function(merge_libraries_gcc)
+@@ -319,10 +319,16 @@ function(merge_libraries_gcc)
    #
    # TODO: Do we need any linking options to pass here?
  
@@ -25,12 +25,12 @@ index eebbdb73..8b8bc602 100644
 +  file(WRITE objects ${joined_objs})
    execute_process(
 -    COMMAND ${CMAKE_AR} -r ${TARGET} ${merge_objs}
--    RESULT_VARIABLE res
 +    COMMAND cat objects
 +    COMMAND xargs ${CMAKE_AR} -r ${TARGET}
+     RESULT_VARIABLE res
    )
 +  if (res)
-+    message(FATAL_ERROR "FAILED AR")
++    message(FATAL_ERROR "Failed AR")
 +  endif()
    execute_process(
      COMMAND ${CMAKE_RANLIB} ${TARGET}
