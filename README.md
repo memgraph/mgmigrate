@@ -6,11 +6,11 @@
   <a href="https://github.com/memgraph/mgmigrate/LICENSE">
     <img src="https://img.shields.io/github/license/memgraph/mgmigrate" alt="license" title="license"/>
   </a>
-  <a href="https://github.com/memgraph/mgmigrate">
-    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="build" title="build"/>
-  </a>
   <a href="https://github.com/memgraph/mgmigrate/actions">
     <img src="https://img.shields.io/github/workflow/status/memgraph/mgmigrate/CI" alt="build" title="build"/>
+  </a>
+  <a href="https://github.com/memgraph/mgmigrate">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="build" title="build"/>
   </a>
 </p>
 
@@ -21,8 +21,11 @@
 </p>
 
 Welcome to the **mgmigrate** tool repository. This tool can help you migrate
-data from PostgreSQL or MySQL to Memgraph. It can also be used to migrate data
-between Memgraph instances.
+data from a
+[PostgreSQL](https://memgraph.com/docs/memgraph/import-data/migrate/postgresql)
+or [MySQL](https://memgraph.com/docs/memgraph/import-data/migrate/mysql)
+database to Memgraph. It can also be used to migrate data between Memgraph
+instances.
 
 ## ⚙️ Installation guide
 
@@ -88,7 +91,7 @@ Continue with the [Building and installing](#building-and-installing) step.
 
 ### macOS
 
-On **MacOS**, first make sure you have
+On **macOS**, first, make sure you have
 [XCode](https://developer.apple.com/xcode/) and [Homebrew](https://brew.sh)
 installed. Then, in the terminal, run:
 
@@ -107,6 +110,7 @@ cmake -DCMAKE_BUILD_TYPE=Release -DOPENSSL_ROOT_DIR="$(ls -rd -- /usr/local/Cell
 Continue with the [Building and installing](#building-and-installing) step.
 
 ### Building and installing
+
 After running CMake, you should see a Makefile in the build directory. Then you
 can build the project by running:
 
@@ -121,12 +125,31 @@ source directory and configure the build by running CMake from it as follows:
 make install
 ```
 
-This will install to system default installation directory. If you want to
-change this location, use `-DCMAKE_INSTALL_PREFIX` option when running CMake.
+This will install mgmigrate in the default system installation directory. If you
+want to change this location, use `-DCMAKE_INSTALL_PREFIX` option when running
+CMake.
 
 ## 📋 Usage
 
-Here is an example of how to run the mgmigrate tool:
+### MySQL
+
+This is an example of using mgmigrate with a MySQL database:
+
+```console
+build/src/mgmigrate --source-kind=mysql /
+  --source-host 127.0.0.1 /
+  --source-port 33060 /
+  --source-username root /
+  --source-password mysql /
+  --source-database=exampledatabase /
+  --destination-host 127.0.0.1 /
+  --destination-port 7687 /
+  --destination-use-ssl=false
+```
+
+### PostgreSQL
+
+Here is an example of how to use the mgmigrate tool with PostgreSQL:
 
 ```console
 build/src/mgmigrate --source-kind=postgresql /
@@ -139,6 +162,8 @@ build/src/mgmigrate --source-kind=postgresql /
   --destination-port 7687 /
   --destination-use-ssl=false
 ```
+
+## 🔎 Arguments
 
 The available arguments are:
 
@@ -156,11 +181,3 @@ The available arguments are:
 | --destination-username| Username for the destination database. | -
 | --destination-password| Password for the destination database. | -
 | --destination-use-ssl | Should the connection to the destination database (if Memgraph) use SSL. | false
-
-### Examples
-
-You can find more usage examples in the tests directory:
-* [`memgraph_e2e.py`](/tests/e2e/memgraph_e2e.py)
-* [`mysql_e2e.py`](/tests/e2e/mysql_e2e.py)
-* [`postresql_e2e.py`](/tests/e2e/postgresql_e2e.py)
-*
