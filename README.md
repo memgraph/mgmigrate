@@ -40,14 +40,14 @@ You can install mgmigrate on the following systems:
 To install compile dependencies on **Debian / Ubuntu** run:
 
 ```
-apt-get install -y git cmake make gcc g++ python3
+apt-get install -y git cmake make gcc g++ python3 libpq-dev postgresql-server-dev-all
 pip3 install pymgclient psycopg2 mysql-connector-python
 ```
 
 On **RedHat / CentOS / Fedora** run:
 
 ```
-yum install -y git cmake make gcc gcc-c++ python3
+yum install -y git cmake make gcc gcc-c++ python3 libpqxx-devel
 pip3 install pymgclient psycopg2 mysql-connector-python
 ```
 
