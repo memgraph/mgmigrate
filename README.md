@@ -78,8 +78,8 @@ following command inside the MSYS2 MINGW64 terminal:
 pacman -Syu --needed base-devel git mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-openssl mingw-w64-x86_64-postgresql
 ```
 
-Once all the requirements are in place, create a build directory inside the
-source directory and configure the build by running CMake from it as follows:
+Once all the requirements are in place, configure the build by running CMake 
+from it as follows:
 
 ```console
 mkdir build
