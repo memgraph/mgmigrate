@@ -20,6 +20,11 @@
     alt="Follow @memgraphdb" /></a>
 </p>
 
+## Notice: 
+
+**The project has been archived. It's based on some really interesting research papers, however unfortunately the code has not kept up with changes so we've decided to archive it. We might revisit this research and resurrect this project in the future.
+If you would like to contribute, have feedback or suggestions please visit our [Discord server](https://www.discord.gg/memgraph)**
+
 Welcome to the **mgmigrate** tool repository. This tool can help you migrate
 data from a
 [PostgreSQL](https://memgraph.com/docs/memgraph/import-data/migrate/postgresql)
