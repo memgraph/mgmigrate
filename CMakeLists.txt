@@ -3,12 +3,9 @@ cmake_minimum_required(VERSION 3.14)
 project(mgmigrate VERSION 0.0.1)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
-
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 # Set default build type to 'Debug'
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Debug")
@@ -36,14 +33,12 @@ endif()
 # ------------------------------------------------------------------------------
 # --------------------------- EXTERNAL DEPENDENCIES ----------------------------
 # ------------------------------------------------------------------------------
-
 include(ExternalProject)
 
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
-
 find_package(PostgreSQL REQUIRED)
 
 if(MGMIGRATE_ON_LINUX OR MGMIGRATE_ON_OSX)
@@ -56,7 +51,6 @@ if(MGMIGRATE_ON_LINUX OR MGMIGRATE_ON_OSX)
     CONFIGURE_COMMAND ""
     BUILD_COMMAND     unset MAKEFLAGS && unset MFLAGS && unset MAKELEVEL && ${CMAKE_CURRENT_SOURCE_DIR}/scripts/build-libpq.py <SOURCE_DIR> <INSTALL_DIR>
     INSTALL_COMMAND   "")
-
   set(MGMIGRATE_POSTGRESQL_LIBRARIES ${POSTGRESQL_ROOT}/libpq.a ${POSTGRESQL_ROOT}/libpgcommon.a ${POSTGRESQL_ROOT}/libpgport.a)
 endif()
 
@@ -78,7 +72,6 @@ ExternalProject_Add(gflags-proj
   CMAKE_ARGS        "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
                     "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
                     "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
-
 set(GFLAGS_INCLUDE_DIR ${GFLAGS_ROOT}/include)
 set(GFLAGS_LIBRARY_PATH ${GFLAGS_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}gflags${GFLAGS_LIB_SUFFIX}.a)
 set(GFLAGS_DEBUG_LIBRARY_PATH ${GFLAGS_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}gflags${GFLAGS_LIB_SUFFIX}_debug.a)
@@ -102,7 +95,6 @@ ExternalProject_Add(glog-proj
                     "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
                     "-DBUILD_SHARED_LIBS=OFF"
   DEPENDS           gflags-proj)
-
 set(GLOG_INCLUDE_DIR ${GLOG_ROOT}/include)
 set(GLOG_LIBRARY_PATH ${GLOG_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}glog.a)
 set(GLOG_DEBUG_LIBRARY_PATH ${GLOG_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}glogd.a)
@@ -113,11 +105,10 @@ set_target_properties(glog PROPERTIES
   INTERFACE_LINK_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}")
 add_dependencies(glog glog-proj)
 
-if(MGMIGRATE_ON_OSX)
+# Setup mgclient
+if(OPENSSL_ROOT_DIR)
   set(MGMIGRATE_MGCLIENT_OPENSSL_ROOTDIR_FLAG "-DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR}")
 endif()
-
-# Setup mgclient
 set(MG_CLIENT_ROOT ${PROJECT_BINARY_DIR}/mgclient)
 ExternalProject_Add(mgclient-proj
   PREFIX            ${MG_CLIENT_ROOT}
@@ -130,7 +121,6 @@ ExternalProject_Add(mgclient-proj
                     "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
                     ${MGMIGRATE_MGCLIENT_OPENSSL_ROOTDIR_FLAG}
                     "-DBUILD_TESTING=OFF")
-
 set(MG_CLIENT_INCLUDE_DIR ${MG_CLIENT_ROOT}/include)
 set(MG_CLIENT_LIBRARY_PATH ${MG_CLIENT_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}mgclient.a)
 add_library(mgclient STATIC IMPORTED)
@@ -153,7 +143,6 @@ ExternalProject_Add(pqxx-proj
   "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
   "-DBUILD_SHARED_LIBS=OFF"
   "-DBUILD_TEST=OFF")
-
 set(PQXX_INCLUDE_DIR ${PQXX_ROOT}/include)
 set(PQXX_LIBRARY_PATH ${PQXX_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}pqxx.a)
 add_library(pqxx STATIC IMPORTED)
@@ -161,14 +150,12 @@ set_target_properties(pqxx PROPERTIES
   IMPORTED_LOCATION "${PQXX_LIBRARY_PATH}"
   INTERFACE_LINK_LIBRARIES "${OPENSSL_LIBRARIES}")
 add_dependencies(pqxx pqxx-proj)
-
 include_directories(${PQXX_INCLUDE_DIR})
 
-if(MGMIGRATE_ON_OSX)
+# Setup MySQL Connector/C++
+if(OPENSSL_ROOT_DIR)
   set(MGMIGRATE_MYSQL_CONN_OPENSSL_ROOTDIR_FLAG "-DWITH_SSL=${OPENSSL_ROOT_DIR}")
 endif()
-
-# Setup MySQL Connector/C++
 set(MYSQL_CONN_ROOT ${PROJECT_BINARY_DIR}/mysqlconnector)
 ExternalProject_Add(mysqlconnector-proj
   PREFIX         ${MYSQL_CONN_ROOT}
@@ -183,7 +170,6 @@ ExternalProject_Add(mysqlconnector-proj
   "-DBUILD_STATIC=ON"
   ${MGMIGRATE_MYSQL_CONN_OPENSSL_ROOTDIR_FLAG}
   "-DBUILD_TEST=OFF")
-
 set(MYSQL_CONN_INCLUDE_DIR ${MYSQL_CONN_ROOT}/include)
 set(MYSQL_CONN_LIBRARY_PATH ${MYSQL_CONN_ROOT}/lib64/${MGMIGRATE_FIND_LIBRARY_PREFIXES}mysqlcppconn8-static.a)
 set(MYSQL_CONN_DEBUG_LIBRARY_PATH ${MYSQL_CONN_ROOT}/lib64/debug/${MGMIGRATE_FIND_LIBRARY_PREFIXES}mysqlcppconn8-static.a)
@@ -193,11 +179,10 @@ set_target_properties(mysqlconnector PROPERTIES
   IMPORTED_LOCATION_DEBUG "${MYSQL_CONN_DEBUG_LIBRARY_PATH}"
   INTERFACE_LINK_LIBRARIES "${OPENSSL_LIBRARIES};${THREADS_LIBRARIES}")
 add_dependencies(mysqlconnector mysqlconnector-proj)
-
 include_directories(${MYSQL_CONN_INCLUDE_DIR})
 
-
 # Setup gtest
+# TODO(gitbuda): Replace all gtest External with Fetch
 set(GTEST_ROOT ${PROJECT_BINARY_DIR}/gtest)
 ExternalProject_Add(gtest-proj
   PREFIX            ${GTEST_ROOT}
@@ -208,7 +193,6 @@ ExternalProject_Add(gtest-proj
                     "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
                     "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
                     "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
-
 set(GTEST_INCLUDE_DIR ${GTEST_ROOT}/include)
 set(GTEST_LIBRARY_PATH ${GTEST_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}gtest.a)
 set(GTEST_DEBUG_LIBRARY_PATH ${GTEST_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}gtestd.a)
@@ -218,7 +202,6 @@ set_target_properties(gtest PROPERTIES
   IMPORTED_LOCATION_DEBUG "${GTEST_DEBUG_LIBRARY_PATH}"
   INTERFACE_LINK_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}")
 add_dependencies(gtest gtest-proj)
-
 set(GTEST_MAIN_LIBRARY_PATH ${GTEST_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}gtest_main.a)
 set(GTEST_MAIN_DEBUG_LIBRARY_PATH ${GTEST_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}gtest_maind.a)
 add_library(gtest-main STATIC IMPORTED)
@@ -227,7 +210,6 @@ set_target_properties(gtest-main PROPERTIES
   IMPORTED_LOCATION_DEBUG "${GTEST_MAIN_DEBUG_LIBRARY_PATH}"
   INTERFACE_LINK_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}")
 add_dependencies(gtest-main gtest-proj)
-
 # Setup gmock
 set(GMOCK_LIBRARY_PATH ${GTEST_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}gmock.a)
 set(GMOCK_DEBUG_LIBRARY_PATH ${GTEST_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}gmockd.a)
@@ -237,7 +219,6 @@ set_target_properties(gmock PROPERTIES
   IMPORTED_LOCATION_DEBUG "${GMOCK_DEBUG_LIBRARY_PATH}"
   INTERFACE_LINK_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}")
 add_dependencies(gmock gtest-proj)
-
 set(GMOCK_MAIN_LIBRARY_PATH ${GTEST_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}gmock_main.a)
 set(GMOCK_MAIN_DEBUG_LIBRARY_PATH ${GTEST_ROOT}/lib/${MGMIGRATE_FIND_LIBRARY_PREFIXES}gmock_maind.a)
 add_library(gmock-main STATIC IMPORTED)
@@ -247,8 +228,6 @@ set_target_properties(gmock-main PROPERTIES
   INTERFACE_LINK_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}")
 add_dependencies(gmock-main gtest-proj)
 
-
 # ------------------------------------------------------------------------------
-
 add_subdirectory(src)
 add_subdirectory(tests)
